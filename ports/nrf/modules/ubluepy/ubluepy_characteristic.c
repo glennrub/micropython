@@ -177,10 +177,20 @@ STATIC mp_obj_t char_uuid(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(ubluepy_characteristic_get_uuid_obj, char_uuid);
 
+/// \method getDescriptors()
+/// Return list with all descriptors registered in the Characteristic.
+///
+STATIC mp_obj_t characteristic_get_descs(mp_obj_t self_in) {
+    ubluepy_characteristic_obj_t * self = MP_OBJ_TO_PTR(self_in);
+
+    return self->desc_list;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(ubluepy_characteristic_get_descs_obj, characteristic_get_descs);
 
 STATIC const mp_rom_map_elem_t ubluepy_characteristic_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_read),                MP_ROM_PTR(&ubluepy_characteristic_read_obj) },
     { MP_ROM_QSTR(MP_QSTR_write),               MP_ROM_PTR(&ubluepy_characteristic_write_obj) },
+    { MP_ROM_QSTR(MP_QSTR_getDescriptors),      MP_ROM_PTR(&ubluepy_characteristic_get_descs_obj) },
 #if 0
     { MP_ROM_QSTR(MP_QSTR_supportsRead),        MP_ROM_PTR(&ubluepy_characteristic_supports_read_obj) },
     { MP_ROM_QSTR(MP_QSTR_propertiesToString),  MP_ROM_PTR(&ubluepy_characteristic_properties_to_str_obj) },
