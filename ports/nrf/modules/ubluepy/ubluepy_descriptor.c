@@ -63,7 +63,65 @@ STATIC mp_obj_t ubluepy_descriptor_make_new(const mp_obj_type_t *type, size_t n_
     return MP_OBJ_FROM_PTR(s);
 }
 
+void desc_data_callback(mp_obj_t self_in, uint16_t length, uint8_t * p_data) {
+    ubluepy_descriptor_obj_t * self = MP_OBJ_TO_PTR(self_in);
+    self->value_data = mp_obj_new_bytearray(length, p_data);
+}
+
+/// \method read()
+/// Read Descriptor value.
+///
+STATIC mp_obj_t desc_read(mp_obj_t self_in) {
+    ubluepy_descriptor_obj_t * self = MP_OBJ_TO_PTR(self_in);
+
+#if MICROPY_PY_UBLUEPY_CENTRAL
+    ble_drv_attr_c_read(self->p_char->p_service->p_periph->conn_handle,
+                        self->handle,
+                        self_in,
+                        desc_data_callback);
+
+    return self->value_data;
+#else
+    (void)self;
+    return mp_const_none;
+#endif
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(ubluepy_descriptor_read_obj, desc_read);
+
+/// \method write(data)
+/// Write Descriptor value.
+///
+STATIC mp_obj_t desc_write(mp_obj_t self_in, mp_obj_t data) {
+    ubluepy_descriptor_obj_t *self = MP_OBJ_TO_PTR(self_in);
+
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(data, &bufinfo, MP_BUFFER_READ);
+
+#if MICROPY_PY_UBLUEPY_CENTRAL
+	ble_drv_attr_c_write(self->p_char->p_service->p_periph->conn_handle,
+						 self->handle,
+						 bufinfo.len,
+						 bufinfo.buf,
+						 false);
+#endif
+
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(ubluepy_descriptor_write_obj, desc_write);
+
+/// \method uuid()
+/// Get UUID instance of the descriptor.
+///
+STATIC mp_obj_t desc_uuid(mp_obj_t self_in) {
+    ubluepy_descriptor_obj_t * self = MP_OBJ_TO_PTR(self_in);
+    return MP_OBJ_FROM_PTR(self->p_uuid);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(ubluepy_descriptor_get_uuid_obj, desc_uuid);
+
 STATIC const mp_rom_map_elem_t ubluepy_descriptor_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_read),                MP_ROM_PTR(&ubluepy_descriptor_read_obj) },
+    { MP_ROM_QSTR(MP_QSTR_write),               MP_ROM_PTR(&ubluepy_descriptor_write_obj) },
+    { MP_ROM_QSTR(MP_QSTR_uuid),                MP_ROM_PTR(&ubluepy_descriptor_get_uuid_obj) },
 #if 0
     { MP_ROM_QSTR(MP_QSTR_binVal), MP_ROM_PTR(&ubluepy_descriptor_bin_val_obj) },
 #endif

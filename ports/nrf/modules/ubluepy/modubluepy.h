@@ -76,6 +76,7 @@ p.advertise(device_name="micr", services=[s])
 extern const mp_obj_type_t ubluepy_uuid_type;
 extern const mp_obj_type_t ubluepy_service_type;
 extern const mp_obj_type_t ubluepy_characteristic_type;
+extern const mp_obj_type_t ubluepy_descriptor_type;
 extern const mp_obj_type_t ubluepy_peripheral_type;
 extern const mp_obj_type_t ubluepy_scanner_type;
 extern const mp_obj_type_t ubluepy_scan_entry_type;
@@ -121,6 +122,9 @@ typedef struct _ubluepy_peripheral_obj_t {
     mp_obj_t            notif_handler;
     mp_obj_t            conn_handler;
     mp_obj_t            service_list;
+    volatile bool       encrypted;
+    volatile bool       bonded;
+    volatile bool       bonding_requested;
 } ubluepy_peripheral_obj_t;
 
 typedef struct _ubluepy_service_obj_t {
@@ -145,13 +149,17 @@ typedef struct _ubluepy_characteristic_obj_t {
     uint8_t                 props;
     uint8_t                 attrs;
     ubluepy_service_obj_t * p_service;
+    mp_obj_t                desc_list;
     mp_obj_t                value_data;
 } ubluepy_characteristic_obj_t;
 
 typedef struct _ubluepy_descriptor_obj_t {
-    mp_obj_base_t           base;
-    uint16_t                handle;
-    ubluepy_uuid_obj_t    * p_uuid;
+    mp_obj_base_t                  base;
+    uint16_t                       handle;
+    ubluepy_uuid_obj_t    *        p_uuid;
+    uint16_t                       char_handle;
+    ubluepy_characteristic_obj_t * p_char;
+    mp_obj_t                       value_data;
 } ubluepy_descriptor_obj_t;
 
 typedef struct _ubluepy_delegate_obj_t {
