@@ -38,6 +38,9 @@
 #define MICROPY_PY_MACHINE_TEMP     (1)
 #define MICROPY_PY_RANDOM_HW_RNG    (1)
 
+#define MICROPY_PY_USOCKET          (1)
+#define MICROPY_PY_NETWORK          (1)
+
 #define MICROPY_HW_HAS_LED          (1)
 #define MICROPY_HW_LED_COUNT        (4)
 #define MICROPY_HW_LED_PULLUP       (1)

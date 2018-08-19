@@ -58,8 +58,11 @@ INC += -I./modules/music
 INC += -I./modules/random
 INC += -I./modules/ble
 INC += -I./modules/board
+INC += -I./modules/socket
+INC += -I./modules/network
 INC += -I../../lib/mp-readline
 INC += -I./drivers/bluetooth
+INC += -I./drivers/wifi
 INC += -I./drivers
 INC += -I../../lib/nrfx/
 INC += -I../../lib/nrfx/drivers
@@ -158,6 +161,7 @@ SRC_LIB += $(addprefix lib/,\
 	utils/pyexec.c \
 	utils/interrupt_char.c \
 	timeutils/timeutils.c \
+	netutils/netutils.c \
 	)
 
 ifeq ($(MICROPY_FATFS), 1)
@@ -199,6 +203,7 @@ SRC_C += \
 	drivers/ticker.c \
 	drivers/bluetooth/ble_drv.c \
 	drivers/bluetooth/ble_uart.c \
+	drivers/wifi/cc3100_drv.c \
 
 DRIVERS_SRC_C += $(addprefix modules/,\
 	machine/modmachine.c \
@@ -230,7 +235,28 @@ DRIVERS_SRC_C += $(addprefix modules/,\
 	music/musictunes.c \
 	ble/modble.c \
 	random/modrandom.c \
+	socket/modusocket.c \
+	network/modnetwork.c \
+	network/modnwcc31k.c \
 	)
+
+ifeq ($(MICROPY_PY_CC31K),1)
+CC3100_DIR=drivers/cc3100
+INC += -I$(TOP)/$(CC3100_DIR)/inc
+CFLAGS_MOD += -DMICROPY_PY_CC31K=1
+SRC_MOD += $(addprefix $(CC3100_DIR)/src/,\
+	device.c \
+	driver.c \
+	flowcont.c \
+	fs.c \
+	netapp.c \
+	netcfg.c \
+	nonos.c \
+	socket.c \
+	spawn.c \
+	wlan.c \
+	)
+endif
 
 # Custom micropython startup file with smaller interrupt vector table
 # than the file provided in nrfx.

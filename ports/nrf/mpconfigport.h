@@ -219,6 +219,8 @@ extern const struct _mp_obj_module_t mp_module_uos;
 extern const struct _mp_obj_module_t mp_module_ubluepy;
 extern const struct _mp_obj_module_t music_module;
 extern const struct _mp_obj_module_t random_module;
+extern const struct _mp_obj_module_t mp_module_usocket;
+extern const struct _mp_obj_module_t mp_module_network;
 
 #if MICROPY_PY_UBLUEPY
 #define UBLUEPY_MODULE                      { MP_ROM_QSTR(MP_QSTR_ubluepy), MP_ROM_PTR(&mp_module_ubluepy) },
@@ -245,6 +247,24 @@ extern const struct _mp_obj_module_t random_module;
 #define MICROPY_BOARD_BUILTINS
 #endif // BOARD_SPECIFIC_MODULES
 
+#if MICROPY_PY_USOCKET
+// usocket implementation provided by skeleton wrapper
+#define SOCKET_BUILTIN_MODULE               { MP_ROM_QSTR(MP_QSTR_usocket), MP_ROM_PTR(&mp_module_usocket) },
+#define SOCKET_BUILTIN_MODULE_WEAK_LINKS    { MP_ROM_QSTR(MP_QSTR_socket), MP_ROM_PTR(&mp_module_usocket) },
+#define SOCKET_POLL
+#else
+// no usocket module
+#define SOCKET_BUILTIN_MODULE
+#define SOCKET_BUILTIN_MODULE_WEAK_LINKS
+#define SOCKET_POLL
+#endif
+
+#if MICROPY_PY_NETWORK
+#define NETWORK_BUILTIN_MODULE              { MP_ROM_QSTR(MP_QSTR_network), MP_ROM_PTR(&mp_module_network) },
+#else
+#define NETWORK_BUILTIN_MODULE
+#endif
+
 #if BLUETOOTH_SD
 
 #if MICROPY_PY_BLE
@@ -264,6 +284,8 @@ extern const struct _mp_obj_module_t ble_module;
     MUSIC_MODULE \
     UBLUEPY_MODULE \
     RANDOM_MODULE \
+    SOCKET_BUILTIN_MODULE \
+    NETWORK_BUILTIN_MODULE \
     MICROPY_BOARD_BUILTINS \
 
 
@@ -276,6 +298,8 @@ extern const struct _mp_obj_module_t ble_module;
     { MP_ROM_QSTR(MP_QSTR_uos), MP_ROM_PTR(&mp_module_uos) }, \
     MUSIC_MODULE \
     RANDOM_MODULE \
+    SOCKET_BUILTIN_MODULE \
+    NETWORK_BUILTIN_MODULE \
     MICROPY_BOARD_BUILTINS \
 
 
@@ -284,6 +308,7 @@ extern const struct _mp_obj_module_t ble_module;
 #define MICROPY_PORT_BUILTIN_MODULE_WEAK_LINKS \
     { MP_ROM_QSTR(MP_QSTR_os), MP_ROM_PTR(&mp_module_uos) }, \
     { MP_ROM_QSTR(MP_QSTR_time), MP_ROM_PTR(&mp_module_utime) }, \
+    SOCKET_BUILTIN_MODULE_WEAK_LINKS \
 
 // extra built in names to add to the global namespace
 #define MICROPY_PORT_BUILTINS \
@@ -333,6 +358,10 @@ extern const struct _mp_obj_module_t ble_module;
     \
     /* micro:bit root pointers */ \
     void *async_data[2]; \
+    \
+    /* list of registered NICs */ \
+    mp_obj_list_t mod_network_nic_list; \
+
 
 #define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 
@@ -342,3 +371,12 @@ extern const struct _mp_obj_module_t ble_module;
 #define MICROPY_PIN_DEFS_PORT_H "pin_defs_nrf5.h"
 
 #endif
+
+//#define MICROPY_MPHALPORT_H                         "cc3200_hal.h"
+#define MICROPY_PORT_HAS_TELNET                     (0)
+#define MICROPY_PORT_HAS_FTP                        (0)
+
+#define MICROPY_PORT_WLAN_AP_SSID                   "SSID"
+#define MICROPY_PORT_WLAN_AP_KEY                    "PASSKEY"
+#define MICROPY_PORT_WLAN_AP_SECURITY               SL_SEC_TYPE_WPA_WPA2
+#define MICROPY_PORT_WLAN_AP_CHANNEL                5

@@ -32,6 +32,7 @@
 
 #include MICROPY_PIN_DEFS_PORT_H
 #include "py/obj.h"
+#include "nrfx_gpiote.h"
 
 typedef struct {
   mp_obj_base_t base;
@@ -95,5 +96,12 @@ const pin_obj_t *pin_find_named_pin(const mp_obj_dict_t *named_pins, mp_obj_t na
 const pin_af_obj_t *pin_find_af(const pin_obj_t *pin, uint8_t fn, uint8_t unit);
 const pin_af_obj_t *pin_find_af_by_index(const pin_obj_t *pin, mp_uint_t af_idx);
 const pin_af_obj_t *pin_find_af_by_name(const pin_obj_t *pin, const char *name);
+
+void extint_register(nrfx_gpiote_pin_t     pin,
+                     nrf_gpiote_polarity_t sense,
+                     nrf_gpio_pin_pull_t   pull,
+                     mp_obj_t              callback);
+void extint_enable(nrfx_gpiote_pin_t pin);
+void extint_disable(nrfx_gpiote_pin_t pin);
 
 #endif // __MICROPY_INCLUDED_NRF5_PIN_H__
