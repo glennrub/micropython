@@ -535,26 +535,10 @@ STATIC void pin_common_irq_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t 
     mp_call_function_1(pin_handler, (mp_obj_t)pin_obj);
 }
 
-STATIC mp_obj_t pin_irq(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-	enum {ARG_handler, ARG_trigger, ARG_wake};
-    static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_handler, MP_ARG_OBJ | MP_ARG_REQUIRED,  {.u_obj = mp_const_none} },
-        { MP_QSTR_trigger, MP_ARG_INT,  {.u_int = NRF_GPIOTE_POLARITY_LOTOHI | NRF_GPIOTE_POLARITY_HITOLO} },
-        { MP_QSTR_wake,    MP_ARG_BOOL, {.u_bool = false} },
-    };
-    pin_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
-    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-
-    nrfx_gpiote_pin_t pin = self->pin;
-
+void extint_register(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t sense, nrf_gpio_pin_pull_t pull, mp_obj_t callback) {
     nrfx_gpiote_in_config_t config = NRFX_GPIOTE_CONFIG_IN_SENSE_TOGGLE(true);
-    if (args[ARG_trigger].u_int == NRF_GPIOTE_POLARITY_LOTOHI) {
-        config.sense = NRF_GPIOTE_POLARITY_LOTOHI;
-    } else if (args[ARG_trigger].u_int == NRF_GPIOTE_POLARITY_HITOLO) {
-        config.sense = NRF_GPIOTE_POLARITY_HITOLO;
-    }
-    config.pull = NRF_GPIO_PIN_PULLUP;
+    config.sense = sense;
+    config.pull  = pull;
 
     nrfx_err_t err_code = nrfx_gpiote_in_init(pin, &config, pin_common_irq_handler);
     if (err_code == NRFX_ERROR_INVALID_STATE) {
@@ -563,11 +547,42 @@ STATIC mp_obj_t pin_irq(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_ar
         nrfx_gpiote_in_init(pin, &config, pin_common_irq_handler);
     }
 
-    MP_STATE_PORT(pin_irq_handlers)[pin] = args[ARG_handler].u_obj;
+    MP_STATE_PORT(pin_irq_handlers)[pin] = callback;
+}
 
+void extint_enable(nrfx_gpiote_pin_t pin) {
     nrfx_gpiote_in_event_enable(pin, true);
+}
 
-    // return the irq object
+void extint_disable(nrfx_gpiote_pin_t pin) {
+    nrfx_gpiote_in_event_disable(pin);
+}
+
+STATIC mp_obj_t pin_irq(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum {ARG_handler, ARG_trigger, ARG_wake};
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_handler, MP_ARG_OBJ | MP_ARG_REQUIRED,  {.u_obj = mp_const_none} },
+        { MP_QSTR_trigger, MP_ARG_INT,  {.u_int = NRF_GPIOTE_POLARITY_LOTOHI | NRF_GPIOTE_POLARITY_HITOLO} },
+        { MP_QSTR_wake,    MP_ARG_BOOL, {.u_bool = false} },
+    };
+
+    pin_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    nrfx_gpiote_pin_t     pin   = self->pin;
+    nrf_gpio_pin_pull_t   pull  = NRF_GPIO_PIN_PULLUP;
+    nrf_gpiote_polarity_t sense =  NRF_GPIOTE_POLARITY_LOTOHI;
+
+    if (args[ARG_trigger].u_int == NRF_GPIOTE_POLARITY_LOTOHI) {
+        sense = NRF_GPIOTE_POLARITY_LOTOHI;
+    } else if (args[ARG_trigger].u_int == NRF_GPIOTE_POLARITY_HITOLO) {
+        sense = NRF_GPIOTE_POLARITY_HITOLO;
+    }
+
+    extint_register(pin, sense, pull, args[ARG_handler].u_obj);
+    extint_enable(pin);
+
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(pin_irq_obj, 1, pin_irq);
