@@ -225,6 +225,30 @@ static uint8_t battery_level_in_percent(const uint16_t mvolts)
 mp_obj_t machine_adc_battery_level(void) {
 
 #if NRF51
+    // Configure ADC
+    NRF_ADC->INTENSET   = ADC_INTENSET_END_Msk;
+    NRF_ADC->CONFIG     = (ADC_CONFIG_RES_8bit                        << ADC_CONFIG_RES_Pos)     |
+                          (ADC_CONFIG_INPSEL_SupplyOneThirdPrescaling << ADC_CONFIG_INPSEL_Pos)  |
+                          (ADC_CONFIG_REFSEL_VBG                      << ADC_CONFIG_REFSEL_Pos)  |
+                          (ADC_CONFIG_PSEL_Disabled                   << ADC_CONFIG_PSEL_Pos)    |
+                          (ADC_CONFIG_EXTREFSEL_None                  << ADC_CONFIG_EXTREFSEL_Pos);
+
+    NRF_ADC->EVENTS_END = 0;
+    NRF_ADC->ENABLE     = ADC_ENABLE_ENABLE_Enabled;
+
+    NRF_ADC->EVENTS_END  = 0;    // Stop any running conversions.
+    NRF_ADC->TASKS_START = 1;
+
+    while (!NRF_ADC->EVENTS_END)
+    {
+    }
+
+    uint8_t     value;
+
+    NRF_ADC->EVENTS_END     = 0;
+    value                   = NRF_ADC->RESULT;
+    NRF_ADC->TASKS_STOP     = 1;
+/*
     nrf_adc_value_t value = 0;
 
     nrfx_adc_channel_t channel_config = {
@@ -232,10 +256,11 @@ mp_obj_t machine_adc_battery_level(void) {
         .config.input      = NRF_ADC_CONFIG_SCALING_SUPPLY_ONE_THIRD,
         .config.reference  = NRF_ADC_CONFIG_REF_VBG,
         .config.input      = NRF_ADC_CONFIG_INPUT_DISABLED,
-        .config.extref     = ADC_CONFIG_EXTREFSEL_None << ADC_CONFIG_EXTREFSEL_Pos // Currently not defined in nrfx/hal.
+//        .config.extref     = ADC_CONFIG_EXTREFSEL_None << ADC_CONFIG_EXTREFSEL_Pos // Currently not defined in nrfx/hal.
     };
 
     nrfx_adc_sample_convert(&channel_config, &value);
+*/
 #else // NRF52
     nrf_saadc_value_t value = 0;
 
@@ -254,7 +279,6 @@ mp_obj_t machine_adc_battery_level(void) {
     nrfx_saadc_channel_init(0, &config);
     nrfx_saadc_sample_convert(0, &value);
 #endif
-
     uint16_t batt_lvl_in_milli_volts = BATTERY_MILLIVOLT(value) + DIODE_VOLT_DROP_MILLIVOLT;
     uint16_t batt_in_percent = battery_level_in_percent(batt_lvl_in_milli_volts);
 

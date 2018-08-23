@@ -195,8 +195,7 @@ pin_init0();
 #if (MICROPY_HW_HAS_LED)
     led_init();
 
-    do_str("import board\r\n" \
-           "board.LED(1).on()",
+    do_str("import sensor",
            MP_PARSE_FILE_INPUT);
 #endif
 

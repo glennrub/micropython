@@ -58,8 +58,8 @@
 #define APP_CFG_NON_CONN_ADV_TIMEOUT 0 // Disable timeout.
 #define NON_CONNECTABLE_ADV_INTERVAL MSEC_TO_UNITS(100, UNIT_0_625_MS)
 
-#define BLE_MIN_CONN_INTERVAL        MSEC_TO_UNITS(12, UNIT_0_625_MS)
-#define BLE_MAX_CONN_INTERVAL        MSEC_TO_UNITS(12, UNIT_0_625_MS)
+#define BLE_MIN_CONN_INTERVAL        MSEC_TO_UNITS(192, UNIT_0_625_MS) // 120ms
+#define BLE_MAX_CONN_INTERVAL        MSEC_TO_UNITS(192, UNIT_0_625_MS)
 #define BLE_SLAVE_LATENCY            0
 #define BLE_CONN_SUP_TIMEOUT         MSEC_TO_UNITS(4000, UNIT_10_MS)
 
@@ -612,7 +612,7 @@ bool ble_drv_advertise_data(ubluepy_advertise_data_t * p_adv_params) {
     m_adv_params.scan_req_notification       = 0; // Do not raise scan request notifications when scanned.
 #endif
     m_adv_params.p_peer_addr                 = NULL;                                // undirected advertisement
-    m_adv_params.interval                    = MSEC_TO_UNITS(100, UNIT_0_625_MS);   // approx 8 ms
+    m_adv_params.interval                    = MSEC_TO_UNITS(1600, UNIT_0_625_MS);   // approx 1000 ms
 
 #if (BLUETOOTH_SD == 110)
     if ((err_code = sd_ble_gap_adv_data_set(adv_data, byte_pos, NULL, 0)) != 0) {
