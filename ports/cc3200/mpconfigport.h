@@ -33,7 +33,6 @@
 #endif
 
 // options to control how MicroPython is built
-
 #define MICROPY_ALLOC_PATH_MAX                      (128)
 #define MICROPY_PERSISTENT_CODE_LOAD                (1)
 #define MICROPY_EMIT_THUMB                          (0)
@@ -117,6 +116,8 @@
 #define MICROPY_PY_UHASHLIB                         (0)
 #define MICROPY_PY_USELECT                          (1)
 #define MICROPY_PY_UTIME_MP_HAL                     (1)
+#define MICROPY_PY_NETWORK                          (1)
+#define MICROPY_PY_USOCKET                          (1)
 
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF      (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE        (0)
@@ -195,6 +196,7 @@ extern const struct _mp_obj_module_t mp_module_ussl;
     mp_obj_list_t pyb_timer_channel_obj_list;                             \
     struct _pyb_uart_obj_t *pyb_uart_objs[2];                             \
     struct _os_term_dup_obj_t *os_term_dup_obj;                           \
+    mp_obj_list_t mod_network_nic_list;                                   \
 
 
 // type definitions for the specific machine

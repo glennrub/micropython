@@ -19,8 +19,9 @@ APP_INC += -Ibootmgr
 APP_INC += -I$(BUILD)
 APP_INC += -I$(BUILD)/genhdr
 APP_INC += -I$(TOP)/ports/stm32
+APP_INC += -I$(TOP)/extmod
 
-APP_CPPDEFINES = -Dgcc -DTARGET_IS_CC3200 -DSL_FULL -DUSE_FREERTOS
+APP_CPPDEFINES = -Dgcc -DTARGET_IS_CC3200 -DSL_FULL -DUSE_FREERTOS -DMICROPY_PY_CC31K=1
 
 APP_FATFS_SRC_C = $(addprefix fatfs/src/,\
 	drivers/sflash_diskio.c \
@@ -78,14 +79,11 @@ APP_MISC_SRC_C = $(addprefix misc/,\
 
 APP_MODS_SRC_C = $(addprefix mods/,\
 	modmachine.c \
-	modnetwork.c \
 	modubinascii.c \
 	moduos.c \
-	modusocket.c \
 	modussl.c \
 	modutime.c \
 	modwipy.c \
-	modwlan.c \
 	pybadc.c \
 	pybpin.c \
 	pybi2c.c \
@@ -156,13 +154,20 @@ APP_STM_SRC_C = $(addprefix ports/stm32/,\
 	irq.c \
 	)
 
+APP_EXTMOD_SRC_C = $(addprefix extmod/,\
+	modnetwork.c \
+	modnwcc31k.c \
+	modusocket.c \
+        )
+
+
 OBJ = $(PY_O) $(addprefix $(BUILD)/, $(APP_FATFS_SRC_C:.c=.o) $(APP_RTOS_SRC_C:.c=.o) $(APP_FTP_SRC_C:.c=.o) $(APP_HAL_SRC_C:.c=.o) $(APP_MISC_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(APP_MODS_SRC_C:.c=.o) $(APP_CC3100_SRC_C:.c=.o) $(APP_SL_SRC_C:.c=.o) $(APP_TELNET_SRC_C:.c=.o) $(APP_UTIL_SRC_C:.c=.o) $(APP_UTIL_SRC_S:.s=.o))
-OBJ += $(addprefix $(BUILD)/, $(APP_MAIN_SRC_C:.c=.o) $(APP_LIB_SRC_C:.c=.o) $(APP_STM_SRC_C:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(APP_MAIN_SRC_C:.c=.o) $(APP_LIB_SRC_C:.c=.o) $(APP_STM_SRC_C:.c=.o) $(APP_EXTMOD_SRC_C:.c=.o))
 OBJ += $(BUILD)/pins.o
 
 # List of sources for qstr extraction
-SRC_QSTR += $(APP_MODS_SRC_C) $(APP_MISC_SRC_C) $(APP_STM_SRC_C)
+SRC_QSTR += $(APP_MODS_SRC_C) $(APP_MISC_SRC_C) $(APP_STM_SRC_C) $(APP_EXTMOD_SRC_C)
 # Append any auto-generated sources that are needed by sources listed in
 # SRC_QSTR
 SRC_QSTR_AUTO_DEPS +=

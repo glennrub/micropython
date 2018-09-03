@@ -112,7 +112,7 @@ STATIC void cc3k_callback(long event_type, char *data, unsigned char length) {
     }
 }
 
-STATIC int cc3k_gethostbyname(mp_obj_t nic, const char *name, mp_uint_t len, uint8_t *out_ip) {
+STATIC int cc3k_gethostbyname(mp_obj_t nic, const char *name, mp_uint_t len, uint8_t *out_ip, uint8_t family) {
     uint32_t ip;
     // CC3000 gethostbyname is unreliable and usually returns -95 on first call
     for (int retry = 5; CC3000_EXPORT(gethostbyname)((char*)name, len, &ip) < 0; retry--) {

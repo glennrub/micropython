@@ -46,7 +46,7 @@
 #include "pybpin.h"
 #include "simplelink.h"
 #include "modnetwork.h"
-#include "modwlan.h"
+#include "modnwcc31k.h"
 #include "osi.h"
 #include "debug.h"
 #include "mpexception.h"

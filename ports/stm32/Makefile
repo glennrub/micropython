@@ -193,9 +193,12 @@ SRC_LIBM += lib/libm/thumb_vfp_sqrtf.c
 endif
 endif
 
+INC += -I$(TOP)/extmod
 EXTMOD_SRC_C = $(addprefix extmod/,\
 	modlwip.c \
 	modonewire.c \
+        modnetwork.c \
+        modusocket.c \
         )
 
 DRIVERS_SRC_C = $(addprefix drivers/,\
@@ -242,8 +245,6 @@ SRC_C = \
 	modstm.c \
 	moduos.c \
 	modutime.c \
-	modusocket.c \
-	modnetwork.c \
 	extint.c \
 	usrsw.c \
 	rng.c \

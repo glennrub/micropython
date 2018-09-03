@@ -89,12 +89,12 @@ typedef struct _mod_network_socket_obj_t {
             int8_t fileno;
             uint8_t proto;
         } u_param;
-#if MICROPY_PY_CC31K
+#if (MICROPY_PY_CC31K)
         int16_t sd;
 #endif
         mp_uint_t u_state;
     };
-#if MICROPY_PY_CC31K
+#if (MICROPY_PY_CC31K)
     uint32_t timeout_ms; // 0 for no timeout
     bool cert_req;
 #endif

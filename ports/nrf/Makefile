@@ -58,12 +58,11 @@ INC += -I./modules/music
 INC += -I./modules/random
 INC += -I./modules/ble
 INC += -I./modules/board
-INC += -I./modules/socket
-INC += -I./modules/network
 INC += -I../../lib/mp-readline
 INC += -I./drivers/bluetooth
 INC += -I./drivers/wifi
 INC += -I./drivers
+INC += -I../../extmod
 INC += -I../../lib/nrfx/
 INC += -I../../lib/nrfx/drivers
 INC += -I../../lib/nrfx/drivers/include
@@ -191,6 +190,13 @@ SRC_NRFX_HAL += $(addprefix lib/nrfx/hal/,\
 	nrf_nvmc.c \
 	)
 
+EXTMOD_SRC_C += $(addprefix extmod/,\
+        modnetwork.c \
+        modusocket.c \
+        modnwcc31k.c \
+        )
+
+
 SRC_C += \
 	main.c \
 	mphalport.c \
@@ -235,16 +241,13 @@ DRIVERS_SRC_C += $(addprefix modules/,\
 	music/musictunes.c \
 	ble/modble.c \
 	random/modrandom.c \
-	socket/modusocket.c \
-	network/modnetwork.c \
-	network/modnwcc31k.c \
 	)
 
 ifeq ($(MICROPY_PY_CC31K),1)
 CC3100_DIR=drivers/cc3100
 INC += -I$(TOP)/$(CC3100_DIR)/inc
 CFLAGS_MOD += -DMICROPY_PY_CC31K=1
-SRC_MOD += $(addprefix $(CC3100_DIR)/src/,\
+DRIVERS_SRC_C += $(addprefix $(CC3100_DIR)/src/,\
 	device.c \
 	driver.c \
 	flowcont.c \
@@ -270,7 +273,7 @@ endif
 
 OBJ += $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
-OBJ += $(addprefix $(BUILD)/, $(SRC_MOD:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(EXTMOD_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX_HAL:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
@@ -330,7 +333,7 @@ $(BUILD)/$(OUTPUT_FILENAME).elf: $(OBJ)
 	$(Q)$(SIZE) $@
 
 # List of sources for qstr extraction
-SRC_QSTR += $(SRC_C) $(DRIVERS_SRC_C) $(SRC_BOARD_MODULES)
+SRC_QSTR += $(SRC_C) $(DRIVERS_SRC_C) $(SRC_BOARD_MODULES) $(EXTMOD_SRC_C)
 
 # Append any auto-generated sources that are needed by sources listed in
 # SRC_QSTR

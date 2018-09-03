@@ -53,13 +53,17 @@ STATIC mp_obj_t socket_make_new(const mp_obj_type_t *type, size_t n_args, size_t
     s->nic_type = NULL;
     s->u_param.domain = MOD_NETWORK_AF_INET;
     s->u_param.type = MOD_NETWORK_SOCK_STREAM;
+    s->u_param.proto = MOD_NETWORK_IPPROTO_TCP;
     s->u_param.fileno = -1;
     if (n_args >= 1) {
         s->u_param.domain = mp_obj_get_int(args[0]);
         if (n_args >= 2) {
             s->u_param.type = mp_obj_get_int(args[1]);
-            if (n_args >= 4) {
-                s->u_param.fileno = mp_obj_get_int(args[3]);
+            if (n_args >= 3) {
+                s->u_param.proto = mp_obj_get_int(args[2]);
+                if (n_args >= 4) {
+                    s->u_param.fileno = mp_obj_get_int(args[3]);
+                }
             }
         }
     }
@@ -160,7 +164,6 @@ STATIC mp_obj_t socket_connect(mp_obj_t self_in, mp_obj_t addr_in) {
     // get address
     uint8_t ip[MOD_NETWORK_IPADDR_BUF_SIZE];
     mp_uint_t port = netutils_parse_inet_addr(addr_in, ip, NETUTILS_BIG);
-
     // check if we need to select a NIC
     socket_select_nic(self, ip);
 
@@ -351,9 +354,15 @@ STATIC const mp_rom_map_elem_t socket_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_setsockopt), MP_ROM_PTR(&socket_setsockopt_obj) },
     { MP_ROM_QSTR(MP_QSTR_settimeout), MP_ROM_PTR(&socket_settimeout_obj) },
     { MP_ROM_QSTR(MP_QSTR_setblocking), MP_ROM_PTR(&socket_setblocking_obj) },
+
+    // stream methods
+    { MP_ROM_QSTR(MP_QSTR_read),            MP_ROM_PTR(&mp_stream_read1_obj) },
+    { MP_ROM_QSTR(MP_QSTR_readinto),        MP_ROM_PTR(&mp_stream_readinto_obj) },
+    { MP_ROM_QSTR(MP_QSTR_readline),        MP_ROM_PTR(&mp_stream_unbuffered_readline_obj) },
+    { MP_ROM_QSTR(MP_QSTR_write),           MP_ROM_PTR(&mp_stream_write_obj) },
 };
 
-STATIC MP_DEFINE_CONST_DICT(socket_locals_dict, socket_locals_dict_table);
+MP_DEFINE_CONST_DICT(socket_locals_dict, socket_locals_dict_table);
 
 mp_uint_t socket_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg, int *errcode) {
     mod_network_socket_obj_t *self = MP_OBJ_TO_PTR(self_in);
@@ -367,7 +376,7 @@ mp_uint_t socket_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg, int *
     return self->nic_type->ioctl(self, request, arg, errcode);
 }
 
-STATIC const mp_stream_p_t socket_stream_p = {
+const mp_stream_p_t socket_stream_p = {
     .ioctl = socket_ioctl,
     .is_text = false,
 };
@@ -409,7 +418,7 @@ STATIC mp_obj_t mod_usocket_getaddrinfo(mp_obj_t host_in, mp_obj_t port_in) {
             mp_obj_t nic = MP_STATE_PORT(mod_network_nic_list).items[i];
             mod_network_nic_type_t *nic_type = (mod_network_nic_type_t*)mp_obj_get_type(nic);
             if (nic_type->gethostbyname != NULL) {
-                int ret = nic_type->gethostbyname(nic, host, hlen, out_ip);
+                int ret = nic_type->gethostbyname(nic, host, hlen, out_ip, MOD_NETWORK_AF_INET);
                 if (ret != 0) {
                     mp_raise_OSError(ret);
                 }
@@ -458,7 +467,7 @@ STATIC const mp_rom_map_elem_t mp_module_usocket_globals_table[] = {
     */
 };
 
-STATIC MP_DEFINE_CONST_DICT(mp_module_usocket_globals, mp_module_usocket_globals_table);
+MP_DEFINE_CONST_DICT(mp_module_usocket_globals, mp_module_usocket_globals_table);
 
 const mp_obj_module_t mp_module_usocket = {
     .base = { &mp_type_module },

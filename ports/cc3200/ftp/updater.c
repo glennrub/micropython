@@ -34,7 +34,7 @@
 #include "updater.h"
 #include "shamd5.h"
 #include "modnetwork.h"
-#include "modwlan.h"
+#include "modnwcc31k.h"
 #include "debug.h"
 #include "osi.h"
 

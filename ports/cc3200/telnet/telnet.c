@@ -33,7 +33,7 @@
 #include "telnet.h"
 #include "simplelink.h"
 #include "modnetwork.h"
-#include "modwlan.h"
+#include "modnwcc31k.h"
 #include "modusocket.h"
 #include "debug.h"
 #include "mpexception.h"

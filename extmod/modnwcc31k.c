@@ -42,27 +42,27 @@
 #include "lib/netutils/netutils.h"
 #include "modnetwork.h"
 #include "modnwcc31k.h"
-//#include "pybrtc.h"
-//#include "debug.h"
+#include "simplelink.h"
+
+#if (TARGET_IS_CC3200)
+#include "pybrtc.h"
+#include "debug.h"
+#include "mpirq.h"
+#include "pybsleep.h"
+#include "mpexception.h"
+#else
+const char mpexception_value_invalid_arguments[]    = "invalid argument(s) value";
+const char mpexception_num_type_invalid_arguments[] = "invalid argument(s) num/type";
+const char mpexception_uncaught[]                   = "uncaught exception";
+#endif // (TARGET_IS_CC3200)
+
+#if (MICROPY_HW_ANTENNA_DIVERSITY)
+#include "antenna.h"
+#endif
+
 #if (MICROPY_PORT_HAS_TELNET || MICROPY_PORT_HAS_FTP)
 #include "serverstask.h"
 #endif
-//#include "mpexception.h"
-//#include "antenna.h"
-
-#if MICROPY_PY_CC31K
-#include "simplelink.h"
-#endif // MICROPY_PY_CC31K
-
-#include "py/obj.h"
-#include "py/objstr.h"
-#include "py/runtime.h"
-#include "py/stream.h"
-#include "py/mphal.h"
-#include "lib/netutils/netutils.h"
-#include "modnetwork.h"
-#include "modnwcc31k.h"
-//#include "mpexception.h"
 
 #define WLAN_MAX_RX_SIZE                16000
 #define WLAN_MAX_TX_SIZE                1476
@@ -525,10 +525,6 @@ typedef enum{
 
 #define ASSERT_ON_ERROR(x)              ASSERT((x) >= 0)
 
-const char mpexception_value_invalid_arguments[]    = "invalid argument(s) value";
-const char mpexception_num_type_invalid_arguments[] = "invalid argument(s) num/type";
-const char mpexception_uncaught[]                   = "uncaught exception";
-
 #if defined(DEBUG)
 #define ASSERT(expr)        assert(expr)
 #else
@@ -554,7 +550,9 @@ STATIC wlan_obj_t wlan_obj = {
     #endif
 };
 
-//STATIC const mp_irq_methods_t wlan_irq_methods;
+#if (TARGET_IS_CC3200)
+STATIC const mp_irq_methods_t wlan_irq_methods;
+#endif // (TARGET_IS_CC3200)
 
 /******************************************************************************
  DECLARE PUBLIC DATA
@@ -901,11 +899,12 @@ void wlan_sl_init (int8_t mode, const char *ssid, uint8_t ssid_len, uint8_t auth
         ASSERT_ON_ERROR(sl_WlanPolicySet(SL_POLICY_CONNECTION, SL_CONNECTION_POLICY(1, 1, 0, 0, 0), NULL, 0));
     }
 
+#if (TARGET_IS_CC3200)
     // set current time and date (needed to validate certificates)
-    //wlan_set_current_time (pyb_rtc_get_seconds());
-
+    wlan_set_current_time (pyb_rtc_get_seconds());
     // start the servers before returning
-    //wlan_servers_start();
+    wlan_servers_start();
+#endif // (TARGET_IS_CC3200)
 }
 
 void wlan_update(void) {
@@ -1158,7 +1157,8 @@ STATIC void wlan_wep_key_unhexlify (const char *key, char *key_out) {
         }
     }
 }
-/*
+
+#if (TARGET_IS_CC3200)
 STATIC void wlan_lpds_irq_enable (mp_obj_t self_in) {
     wlan_obj_t *self = self_in;
     self->irq_enabled = true;
@@ -1173,7 +1173,8 @@ STATIC int wlan_irq_flags (mp_obj_t self_in) {
     wlan_obj_t *self = self_in;
     return self->irq_flags;
 }
-*/
+#endif // (TARGET_IS_CC3200)
+
 STATIC bool wlan_scan_result_is_unique (const mp_obj_list_t *nets, _u8 *bssid) {
     for (int i = 0; i < nets->len; i++) {
         // index 1 in the list is the bssid
@@ -1233,10 +1234,14 @@ STATIC mp_obj_t wlan_init_helper(wlan_obj_t *self, const mp_arg_val_t *args) {
 }
 
 STATIC const mp_arg_t wlan_init_args[] = {
+#if (TARGET_IS_CC3200)
+    { MP_QSTR_id,                             MP_ARG_INT,  {.u_int = 0} },
+#else
     { MP_QSTR_spi,                            MP_ARG_OBJ,  {.u_obj = MP_OBJ_NULL} },
     { MP_QSTR_cs,                             MP_ARG_OBJ,  {.u_obj = MP_OBJ_NULL} },
     { MP_QSTR_en,                             MP_ARG_OBJ,  {.u_obj = MP_OBJ_NULL} },
     { MP_QSTR_irq,                            MP_ARG_OBJ,  {.u_obj = MP_OBJ_NULL} },
+#endif
     { MP_QSTR_mode,                           MP_ARG_INT,  {.u_int = ROLE_STA} },
     { MP_QSTR_ssid,         MP_ARG_KW_ONLY  | MP_ARG_OBJ,  {.u_obj = MP_OBJ_NULL} },
     { MP_QSTR_auth,         MP_ARG_KW_ONLY  | MP_ARG_OBJ,  {.u_obj = mp_const_none} },
@@ -1256,7 +1261,19 @@ STATIC mp_obj_t cc31k_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
     // setup the object
     wlan_obj_t *self = &wlan_obj;
     self->base.type = (mp_obj_t)&mod_network_nic_type_cc31k;
+#if (TARGET_IS_CC3200)
+    // give it to the sleep module
+    pyb_sleep_set_wlan_obj(self);
 
+    if (n_args > 1 || n_kw > 0) {
+        // check the peripheral id
+        if (args[0].u_int != 0) {
+            mp_raise_OSError(MP_ENODEV);
+        }
+        // start the peripheral
+        wlan_init_helper(self, &args[1]);
+    }
+#else
     // set the pins to use
     cc3100_drv_init(
         args[0].u_obj,
@@ -1267,6 +1284,7 @@ STATIC mp_obj_t cc31k_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
 
     // start the peripheral
     wlan_init_helper(self, &args[4]);
+#endif
 
     // register with network module
     mod_network_register_nic((mp_obj_t)self);
@@ -1592,7 +1610,8 @@ STATIC mp_obj_t wlan_mac(size_t n_args, const mp_obj_t *args) {
     }
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(wlan_mac_obj, 1, 2, wlan_mac);
-/*
+
+#if (TARGET_IS_CC3200)
 STATIC mp_obj_t wlan_irq(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     mp_arg_val_t args[mp_irq_INIT_NUM_ARGS];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, mp_irq_INIT_NUM_ARGS, mp_irq_init_args, args);
@@ -1622,7 +1641,8 @@ invalid_args:
     mp_raise_ValueError(mpexception_value_invalid_arguments);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(wlan_irq_obj, 1, wlan_irq);
-*/
+#endif // (TARGET_IS_CC3200)
+
 //STATIC mp_obj_t wlan_connections (mp_obj_t self_in) {
 //    mp_obj_t device[2];
 //    mp_obj_t connections = mp_obj_new_list(0, NULL);
@@ -1696,7 +1716,9 @@ STATIC const mp_rom_map_elem_t cc31k_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_channel),             MP_ROM_PTR(&wlan_channel_obj) },
     { MP_ROM_QSTR(MP_QSTR_antenna),             MP_ROM_PTR(&wlan_antenna_obj) },
     { MP_ROM_QSTR(MP_QSTR_mac),                 MP_ROM_PTR(&wlan_mac_obj) },
-    //{ MP_ROM_QSTR(MP_QSTR_irq),                 MP_ROM_PTR(&wlan_irq_obj) },
+#if (TARGET_IS_CC3200)
+    { MP_ROM_QSTR(MP_QSTR_irq),                 MP_ROM_PTR(&wlan_irq_obj) },
+#endif // (TARGET_IS_CC3200)
     //{ MP_ROM_QSTR(MP_QSTR_connections),         MP_ROM_PTR(&wlan_connections_obj) },
     //{ MP_ROM_QSTR(MP_QSTR_urn),                 MP_ROM_PTR(&wlan_urn_obj) },
     { MP_ROM_QSTR(MP_QSTR_print_ver),           MP_ROM_PTR(&wlan_print_ver_obj) },
@@ -1738,12 +1760,12 @@ const mod_network_nic_type_t mod_network_nic_type_cc31k = {
     .ioctl = cc31k_socket_ioctl,
 };
 
-/*
+#if (TARGET_IS_CC3200)
 STATIC const mp_irq_methods_t wlan_irq_methods = {
     .init = wlan_irq,
     .enable = wlan_lpds_irq_enable,
     .disable = wlan_lpds_irq_disable,
     .flags = wlan_irq_flags,
 };
-*/
+#endif // (TARGET_IS_CC3200)
 #endif // (MICROPY_PY_NETWORK && MICROPY_PY_CC31K)

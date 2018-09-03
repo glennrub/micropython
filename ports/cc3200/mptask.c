@@ -56,7 +56,7 @@
 #include "simplelink.h"
 #include "modnetwork.h"
 #include "modusocket.h"
-#include "modwlan.h"
+#include "modnwcc31k.h"
 #include "serverstask.h"
 #include "telnet.h"
 #include "debug.h"
@@ -149,7 +149,7 @@ soft_reset:
     uart_init0();
     timer_init0();
     readline_init0();
-    mod_network_init0();
+    mod_network_init();
     rng_init0();
 
     pybsleep_reset_cause_t rstcause = pyb_sleep_get_reset_cause();

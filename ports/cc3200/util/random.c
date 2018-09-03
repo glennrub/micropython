@@ -35,7 +35,7 @@
 #include "pybrtc.h"
 #include "simplelink.h"
 #include "modnetwork.h"
-#include "modwlan.h"
+#include "modnwcc31k.h"
 #include "random.h"
 #include "debug.h"
 

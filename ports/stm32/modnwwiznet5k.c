@@ -83,7 +83,7 @@ STATIC void wiz_spi_write(const uint8_t *buf, uint32_t len) {
     (void)status;
 }
 
-STATIC int wiznet5k_gethostbyname(mp_obj_t nic, const char *name, mp_uint_t len, uint8_t *out_ip) {
+STATIC int wiznet5k_gethostbyname(mp_obj_t nic, const char *name, mp_uint_t len, uint8_t *out_ip, uint8_t family) {
     uint8_t dns_ip[MOD_NETWORK_IPADDR_BUF_SIZE] = {8, 8, 8, 8};
     uint8_t *buf = m_new(uint8_t, MAX_DNS_BUF_SIZE);
     DNS_init(0, buf);

@@ -40,7 +40,7 @@
 #include "modusocket.h"
 #include "mpexception.h"
 #include "modnetwork.h"
-#include "modwlan.h"
+#include "modnwcc31k.h"
 
 /******************************************************************************
  DEFINE PRIVATE TYPES

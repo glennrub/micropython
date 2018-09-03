@@ -47,7 +47,7 @@
  ******************************************************************************/
 typedef struct _mp_obj_ssl_socket_t {
     mp_obj_base_t base;
-    mod_network_socket_base_t sock_base;
+    mod_network_socket_obj_t sock_base;
     mp_obj_t o_sock;
 } mp_obj_ssl_socket_t;
 
@@ -102,7 +102,7 @@ STATIC mp_obj_t mod_ssl_wrap_socket(size_t n_args, const mp_obj_t *pos_args, mp_
     }
 
     _i16 _errno;
-    _i16 sd = ((mod_network_socket_obj_t *)args[0].u_obj)->sock_base.sd;
+    _i16 sd = ((mod_network_socket_obj_t *)args[0].u_obj)->sd;
 
     // set the requested SSL method
     _u8 method = args[5].u_int;
@@ -122,7 +122,7 @@ STATIC mp_obj_t mod_ssl_wrap_socket(size_t n_args, const mp_obj_t *pos_args, mp_
     // create the ssl socket
     mp_obj_ssl_socket_t *ssl_sock = m_new_obj(mp_obj_ssl_socket_t);
     // ssl sockets inherit all properties from the original socket
-    memcpy (&ssl_sock->sock_base, &((mod_network_socket_obj_t *)args[0].u_obj)->sock_base, sizeof(mod_network_socket_base_t));
+    memcpy (&ssl_sock->sock_base, ((mod_network_socket_obj_t *)args[0].u_obj), sizeof(mod_network_socket_obj_t));
     ssl_sock->base.type = &ssl_socket_type;
     ssl_sock->sock_base.cert_req = (args[4].u_int == SSL_CERT_REQUIRED) ? true : false;
     ssl_sock->o_sock = args[0].u_obj;

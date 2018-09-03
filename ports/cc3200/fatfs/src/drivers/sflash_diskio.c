@@ -10,7 +10,7 @@
 #include "sflash_diskio.h"
 #include "debug.h"
 #include "modnetwork.h"
-#include "modwlan.h"
+#include "modnwcc31k.h"
 
 #define SFLASH_TIMEOUT_MAX_MS               5500
 #define SFLASH_WAIT_TIME_MS                 5

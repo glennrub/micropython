@@ -40,7 +40,7 @@
 #include "pybsleep.h"
 #include "simplelink.h"
 #include "modnetwork.h"
-#include "modwlan.h"
+#include "modnwcc31k.h"
 #include "mpexception.h"
 
 /// \moduleref pyb
