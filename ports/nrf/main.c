@@ -70,6 +70,16 @@
 #include "softpwm.h"
 #endif
 
+#if MICROPY_PY_NETWORK
+#include "modnetwork.h"
+#endif
+
+#if MICROPY_SECURITY_FS
+#include "extmod/vfs.h"
+#include "securefs.h"
+extern const mp_obj_type_t uos_secfs_type;
+#endif
+
 void do_str(const char *src, mp_parse_input_kind_t input_kind) {
     mp_lexer_t *lex = mp_lexer_new_from_str_len(MP_QSTR__lt_stdin_gt_, src, strlen(src), 0);
     if (lex == NULL) {
@@ -222,6 +232,35 @@ pin_init0();
     ticker_start();
     pwm_start();
 #endif
+
+#if MICROPY_PY_NETWORK
+    mod_network_init();
+#endif
+
+#if MICROPY_MBFS
+#if MICROPY_VFS
+    mp_vfs_mount_t *vfs = m_new_obj(mp_vfs_mount_t);
+    vfs->str = "/flash";
+    vfs->len = 6; // strlen("/flash");
+    vfs->obj = MP_OBJ_TO_PTR(&uos_mbfs_obj);
+    vfs->next = NULL;
+    MP_STATE_VM(vfs_mount_table) = vfs;
+    MP_STATE_PORT(vfs_cur) = vfs;
+#endif // MICROPY_VFS
+#endif // MICROPY_HW_HAS_BUILTIN_FLASH
+
+
+#if MICROPY_SECURITY_FS
+#if MICROPY_VFS
+    // Mount the host FS at the root of our internal VFS
+    mp_obj_t args[2] = {
+        uos_secfs_type.make_new(&uos_secfs_type, 0, 0, NULL),
+        mp_obj_new_str("/secure", 7),
+    };
+    mp_vfs_mount(2, args, (mp_map_t*)&mp_const_empty_map);
+    MP_STATE_PORT(vfs_cur) = MP_VFS_ROOT;
+#endif // MICROPY_VFS
+#endif // MICROPY_SECURITY_FS
 
 led_state(1, 0);
 

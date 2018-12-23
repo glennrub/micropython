@@ -155,6 +155,15 @@ endif
 
 ifeq ($(MCU_VARIANT), nrf91)
 
+LIBBSD_FILE_NAME = $(TOP)/lib/nrfxlib/bsdlib/lib/cortex-m33/hard-float/libbsd_nrf9160_xxaa.a
+LIBOBERON_FILE_NAME = $(TOP)/lib/nrfxlib/crypto/nrf_oberon/lib/cortex-m33/hard-float/liboberon_2.0.7.a
+
+LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lc
+LIBS += -L $(dir $(LIBBSD_FILE_NAME)) -lbsd_nrf9160_xxaa
+LIBS += -L $(dir $(LIBOBERON_FILE_NAME)) -loberon_3.0.0
+
+INC += -I$(TOP)/lib/nrfxlib/bsdlib/include
+
 SRC_LIB += $(addprefix lib/,\
         libm/math.c \
         libm/fmodf.c \
@@ -175,6 +184,20 @@ SRC_LIB += $(addprefix lib/,\
         libm/atanf.c \
         libm/atan2f.c \
         )
+
+SRC_C += \
+        drivers/lte/bsd_os.c
+
+DRIVERS_SRC_C += $(addprefix modules/,\
+        socket/modnetwork.c \
+        socket/modusocket.c \
+        socket/modnwlte.c \
+        socket/moduselect.c \
+	uos/securefs.c \
+	)
+
+INC += -I./modules/socket
+INC += -I./modules/uos
 
 SRC_NRFX += $(addprefix lib/nrfx/drivers/src/,\
         nrfx_uarte.c \
