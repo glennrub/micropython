@@ -66,6 +66,7 @@ INC += -I../../lib/nrfx/drivers
 INC += -I../../lib/nrfx/drivers/include
 INC += -I../../lib/nrfx/mdk
 INC += -I../../lib/nrfx/hal
+INC += -I../../lib/netutils
 
 MCU_VARIANT_UPPER = $(shell echo $(MCU_VARIANT) | tr '[:lower:]' '[:upper:]')
 MCU_SUB_VARIANT_UPPER = $(shell echo $(MCU_SUB_VARIANT) | tr '[:lower:]' '[:upper:]')
@@ -81,12 +82,17 @@ else ifeq ($(MCU_SUB_VARIANT),nrf52832)
 else ifeq ($(MCU_SUB_VARIANT),nrf52840)
 	SYSTEM_C_SRC += $(addprefix lib/nrfx/mdk/, system_nrf52840.c)
 	# Do not pass MCU_VARIANT_UPPER flag, as NRF52 defines NRF52832 only.
+else ifeq ($(MCU_SUB_VARIANT),nrf9160)
+        SYSTEM_C_SRC += $(addprefix lib/nrfx/mdk/, system_nrf9160.c)
+        NRF_DEFINES += -D$(MCU_VARIANT_UPPER)
 endif
 
 NRF_DEFINES += -D$(MCU_SUB_VARIANT_UPPER)
 NRF_DEFINES += -DCONFIG_GPIO_AS_PINRESET
 
 CFLAGS_CORTEX_M = -mthumb -mabi=aapcs -fsingle-precision-constant -Wdouble-promotion
+
+CFLAGS_MCU_m33 = $(CFLAGS_CORTEX_M) -mcpu=cortex-m33 -march=armv8-m.main+dsp -mcmse -mfpu=fpv5-sp-d16 -mfloat-abi=hard
 
 CFLAGS_MCU_m4 = $(CFLAGS_CORTEX_M) -mtune=cortex-m4 -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 
@@ -126,9 +132,6 @@ LIBS = \
 ifeq ($(MCU_VARIANT), nrf52)
 LIBGCC_FILE_NAME = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 
-LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lgcc
-
-
 SRC_LIB += $(addprefix lib/,\
         libm/math.c \
         libm/fmodf.c \
@@ -149,6 +152,65 @@ SRC_LIB += $(addprefix lib/,\
         libm/atanf.c \
         libm/atan2f.c \
 	)
+
+endif
+
+ifeq ($(MCU_VARIANT), nrf91)
+LIBGCC_FILE_NAME = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
+LIBBSD_FILE_NAME = $(TOP)/lib/nrfxlib/bsdlib/lib/cortex-m33/hard-float/libbsd_nrf9160_xxaa.a
+LIBOBERON_FILE_NAME = $(TOP)/lib/nrfxlib/crypto/nrf_oberon/lib/cortex-m33/hard-float/liboberon_2.0.7.a
+
+LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lgcc
+LIBS += -L $(dir $(LIBBSD_FILE_NAME)) -lbsd_nrf9160_xxaa
+LIBS += -L $(dir $(LIBOBERON_FILE_NAME)) -loberon_2.0.7
+
+INC += -I$(TOP)/lib/nrfxlib/bsdlib/include
+
+SRC_LIB += $(addprefix lib/,\
+        libm/math.c \
+        libm/fmodf.c \
+        libm/nearbyintf.c \
+        libm/ef_sqrt.c \
+        libm/kf_rem_pio2.c \
+        libm/kf_sin.c \
+        libm/kf_cos.c \
+        libm/kf_tan.c \
+        libm/ef_rem_pio2.c \
+        libm/sf_sin.c \
+        libm/sf_cos.c \
+        libm/sf_tan.c \
+        libm/sf_frexp.c \
+        libm/sf_modf.c \
+        libm/sf_ldexp.c \
+        libm/asinfacosf.c \
+        libm/atanf.c \
+        libm/atan2f.c \
+        )
+
+SRC_LIB += $(addprefix lib/,\
+        netutils/netutils.c \
+        )
+
+SRC_C += \
+        drivers/lte/bsd_os.c \
+        mbedtls_mock.c \
+
+DRIVERS_SRC_C += $(addprefix modules/,\
+        socket/modnetwork.c \
+        socket/modusocket.c \
+        socket/modnwlte.c \
+	uos/securefs.c \
+	)
+
+INC += -I./modules/socket
+INC += -I./modules/uos
+
+SRC_NRFX += $(addprefix lib/nrfx/drivers/src/,\
+        nrfx_uarte.c \
+        nrfx_twim.c \
+        )
+
+-include boards/$(BOARD)/secureboot/$(BOARD)_secureboot.mk
 
 endif
 
@@ -242,13 +304,15 @@ FROZEN_MPY_PY_FILES := $(shell find -L $(FROZEN_MPY_DIR) -type f -name '*.py')
 FROZEN_MPY_MPY_FILES := $(addprefix $(BUILD)/,$(FROZEN_MPY_PY_FILES:.py=.mpy))
 endif
 
+LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lgcc -lc
+
 OBJ += $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
-OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_MOD:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX_HAL:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SYSTEM_C_SRC:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
 OBJ += $(BUILD)/pins_gen.o
 
 $(BUILD)/$(FATFS_DIR)/ff.o: COPT += -Os
@@ -256,7 +320,11 @@ $(filter $(PY_BUILD)/../extmod/vfs_fat_%.o, $(PY_O)): COPT += -Os
 
 .PHONY: all flash sd binary hex
 
+ifeq ($(MCU_VARIANT), nrf91)
+all: binary hex secureboot
+else
 all: binary hex
+endif
 
 OUTPUT_FILENAME = firmware
 
@@ -276,10 +344,16 @@ FLASHER ?=
 
 ifeq ($(FLASHER),)
 
+ifeq ($(MCU_VARIANT), nrf91)
+flash: $(BUILD)/$(OUTPUT_FILENAME).hex $(BUILD)/secureboot.hex
+	nrfjprog --program $(BUILD)/secureboot.hex --sectorerase -f $(MCU_VARIANT)
+	nrfjprog --program $(BUILD)/$(OUTPUT_FILENAME).hex --sectorerase -f $(MCU_VARIANT)
+	nrfjprog --reset -f $(MCU_VARIANT)
+else
 flash: $(BUILD)/$(OUTPUT_FILENAME).hex
 	nrfjprog --program $< --sectorerase -f $(MCU_VARIANT)
 	nrfjprog --reset -f $(MCU_VARIANT)
-
+endif
 sd: $(BUILD)/$(OUTPUT_FILENAME).hex
 	nrfjprog --eraseall -f $(MCU_VARIANT)
 	nrfjprog --program $(SOFTDEV_HEX) -f $(MCU_VARIANT)

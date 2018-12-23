@@ -86,7 +86,12 @@ void mp_hal_delay_us(mp_uint_t us)
     if (us == 0) {
         return;
     }
-
+#if NRF9160_XXAA
+    for (uint32_t i = 0; i < us; i++)
+    {
+        __NOP();
+    }
+#else // NRF9160_XXAA
     register uint32_t delay __ASM ("r0") = us;
     __ASM volatile (
 #ifdef NRF51
@@ -156,6 +161,7 @@ void mp_hal_delay_us(mp_uint_t us)
 #endif
         " BNE 1b\n"
         : "+r" (delay));
+#endif // NRF9160_XXAA
 }
 
 void mp_hal_delay_ms(mp_uint_t ms)

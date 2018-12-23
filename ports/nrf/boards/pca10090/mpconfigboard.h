@@ -41,6 +41,8 @@
 #define MICROPY_PY_RANDOM_HW_RNG    (0)
 
 #define MICROPY_MBFS                (0)
+#define MICROPY_SECURITY_FS         (1)
+#define MICROPY_VFS                 (1)
 
 #define MICROPY_HW_HAS_LED          (1)
 #define MICROPY_HW_HAS_SWITCH       (0)
@@ -56,6 +58,10 @@
 #define MICROPY_HW_ENABLE_DAC       (0)
 #define MICROPY_HW_ENABLE_CAN       (0)
 
+#define MICROPY_PY_USOCKET          (1)
+#define MICROPY_PY_NETWORK          (1)
+#define MICROPY_PY_LTE_SOCKET       (1)
+
 #define MICROPY_HW_LED_COUNT        (4)
 #define MICROPY_HW_LED_PULLUP       (0)
 
@@ -65,11 +71,21 @@
 #define MICROPY_HW_LED4             (5) // LED4
 
 // UART config
+// VCOM0
 #define MICROPY_HW_UART1_RX         (28)
 #define MICROPY_HW_UART1_TX         (29)
 #define MICROPY_HW_UART1_CTS        (26)
 #define MICROPY_HW_UART1_RTS        (27)
 #define MICROPY_HW_UART1_HWFC       (1)
+
+/*
+// VCOM2
+#define MICROPY_HW_UART1_RX         (0)
+#define MICROPY_HW_UART1_TX         (1)
+#define MICROPY_HW_UART1_CTS        (15)
+#define MICROPY_HW_UART1_RTS        (14)
+#define MICROPY_HW_UART1_HWFC       (1)
+*/
 
 // SPI0 config
 #define MICROPY_HW_SPI0_NAME        "SPI0"

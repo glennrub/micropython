@@ -41,6 +41,11 @@
 #include "uart.h"
 //#include "portmodules.h"
 
+#if MICROPY_SECURITY_FS
+#include "securefs.h"
+extern const mp_obj_type_t uos_secfs_type;
+#endif
+
 #if MICROPY_HW_ENABLE_RNG
 #include "modrandom.h"
 #endif // MICROPY_HW_ENABLE_RNG
@@ -177,6 +182,9 @@ STATIC const mp_rom_map_elem_t os_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_mount), MP_ROM_PTR(&mp_vfs_mount_obj) },
     { MP_ROM_QSTR(MP_QSTR_umount), MP_ROM_PTR(&mp_vfs_umount_obj) },
     { MP_ROM_QSTR(MP_QSTR_VfsFat), MP_ROM_PTR(&mp_fat_vfs_type) },
+#if MICROPY_SECURITY_FS
+    { MP_ROM_QSTR(MP_QSTR_VfsSecure), MP_ROM_PTR(&uos_secfs_type) },
+#endif // MICROPY_SECURITY_FS
 #endif
 };
 
