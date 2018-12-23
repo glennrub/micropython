@@ -48,7 +48,7 @@
 #define MICROPY_REPL_EMACS_KEYS     (0)
 #define MICROPY_REPL_AUTO_INDENT    (1)
 #define MICROPY_KBD_EXCEPTION       (1)
-#define MICROPY_ENABLE_SOURCE_LINE  (0)
+#define MICROPY_ENABLE_SOURCE_LINE  (1)
 #define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_MPZ)
 #if NRF51
 #define MICROPY_FLOAT_IMPL          (MICROPY_FLOAT_IMPL_NONE)
@@ -97,7 +97,7 @@
 #define MICROPY_PY_BUILTINS_STR_SPLITLINES (0)
 #define MICROPY_PY_BUILTINS_MEMORYVIEW (1)
 #define MICROPY_PY_BUILTINS_FROZENSET (1)
-#define MICROPY_PY_BUILTINS_EXECFILE (0)
+#define MICROPY_PY_BUILTINS_EXECFILE (1)
 #define MICROPY_PY_BUILTINS_COMPILE (1)
 #define MICROPY_PY_BUILTINS_HELP    (1)
 #define MICROPY_PY_BUILTINS_HELP_TEXT nrf5_help_text
@@ -114,15 +114,15 @@
 #define MICROPY_PY_COLLECTIONS_ORDEREDDICT (0)
 #define MICROPY_PY_MATH_SPECIAL_FUNCTIONS (0)
 #define MICROPY_PY_CMATH            (0)
-#define MICROPY_PY_IO               (0)
+#define MICROPY_PY_IO               (1)
 #define MICROPY_PY_IO_FILEIO        (0)
 #define MICROPY_PY_UERRNO           (0)
-#define MICROPY_PY_UBINASCII        (0)
+#define MICROPY_PY_UBINASCII        (1)
 #define MICROPY_PY_URANDOM          (0)
 #define MICROPY_PY_URANDOM_EXTRA_FUNCS (0)
 #define MICROPY_PY_UCTYPES          (0)
 #define MICROPY_PY_UZLIB            (0)
-#define MICROPY_PY_UJSON            (0)
+#define MICROPY_PY_UJSON            (1)
 #define MICROPY_PY_URE              (0)
 #define MICROPY_PY_UHEAPQ           (0)
 #define MICROPY_PY_UHASHLIB         (0)
@@ -178,6 +178,9 @@
 #define MICROPY_PY_RANDOM_HW_RNG    (0)
 #endif
 
+#ifndef MICROPY_PY_USELECT_POSIX
+#define MICROPY_PY_USELECT_POSIX    (0)
+#endif
 
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (0)
@@ -219,6 +222,31 @@ extern const struct _mp_obj_module_t mp_module_uos;
 extern const struct _mp_obj_module_t mp_module_ubluepy;
 extern const struct _mp_obj_module_t music_module;
 extern const struct _mp_obj_module_t random_module;
+extern const struct _mp_obj_module_t mp_module_uselect;
+
+#if MICROPY_PY_USOCKET
+extern const struct _mp_obj_module_t mp_module_usocket;
+#define SOCKET_BUILTIN_MODULE               { MP_OBJ_NEW_QSTR(MP_QSTR_usocket), (mp_obj_t)&mp_module_usocket },
+#define SOCKET_BUILTIN_MODULE_WEAK_LINKS    { MP_OBJ_NEW_QSTR(MP_QSTR_socket), (mp_obj_t)&mp_module_usocket },
+#else
+#define SOCKET_BUILTIN_MODULE
+#define SOCKET_BUILTIN_MODULE_WEAK_LINKS
+#endif
+
+#if MICROPY_PY_USELECT_POSIX
+#define MICROPY_PY_USELECT_MODULE            { MP_ROM_QSTR(MP_QSTR_uselect), MP_ROM_PTR(&mp_module_uselect) },
+#define MICROPY_PY_USELECT_MODULE_WEAK_LINKS { MP_ROM_QSTR(MP_QSTR_select), MP_ROM_PTR(&mp_module_uselect) },
+#else
+#define MICROPY_PY_USELECT_MODULE
+#define MICROPY_PY_USELECT_MODULE_WEAK_LINKS
+#endif
+
+#if MICROPY_PY_NETWORK
+extern const struct _mp_obj_module_t mp_module_network;
+#define NETWORK_BUILTIN_MODULE              { MP_OBJ_NEW_QSTR(MP_QSTR_network), (mp_obj_t)&mp_module_network },
+#else
+#define NETWORK_BUILTIN_MODULE
+#endif
 
 #if MICROPY_PY_UBLUEPY
 #define UBLUEPY_MODULE                      { MP_ROM_QSTR(MP_QSTR_ubluepy), MP_ROM_PTR(&mp_module_ubluepy) },
@@ -277,7 +305,9 @@ extern const struct _mp_obj_module_t ble_module;
     MUSIC_MODULE \
     RANDOM_MODULE \
     MICROPY_BOARD_BUILTINS \
-
+    SOCKET_BUILTIN_MODULE \
+    NETWORK_BUILTIN_MODULE \
+    MICROPY_PY_USELECT_MODULE \
 
 #endif // BLUETOOTH_SD
 
@@ -309,6 +339,13 @@ extern const struct _mp_obj_module_t ble_module;
 #define ROOT_POINTERS_SOFTPWM
 #endif
 
+#if MICROPY_PY_NETWORK && MICROPY_PY_LTE_SOCKET
+#define ROOT_POINTERS_NIC_LIST \
+    mp_obj_list_t mod_network_nic_list;
+#else
+#define ROOT_POINTERS_NIC_LIST
+#endif
+
 #if defined(NRF52840_XXAA)
 #define NUM_OF_PINS 48
 #else
@@ -329,6 +366,8 @@ extern const struct _mp_obj_module_t ble_module;
     \
     /* micro:bit root pointers */ \
     void *async_data[2]; \
+    \
+    ROOT_POINTERS_NIC_LIST \
 
 #define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 
