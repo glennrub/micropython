@@ -1137,6 +1137,16 @@ static void ble_evt_handler(ble_evt_t * p_ble_evt) {
             BLE_DRIVER_LOG("GATTS EVT EXCHANGE MTU REQUEST\n");
             (void)sd_ble_gatts_exchange_mtu_reply(p_ble_evt->evt.gatts_evt.conn_handle, 23); // MAX MTU size
             break;
+
+        case BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST:
+            BLE_DRIVER_LOG("GAP EVT DATA LENGTH UPDATE REQUEST\n");
+            ble_gap_data_length_params_t dl_params;
+
+            // Clearing struct indicates BLE_GAP_DATA_LENGTH_AUTO.
+            memset(&dl_params, 0, sizeof(ble_gap_data_length_params_t));
+            (void)sd_ble_gap_data_length_update(p_ble_evt->evt.gap_evt.conn_handle, &dl_params, NULL);
+            break;
+
 #endif // (BLUETOOTH_SD == 132) || (BLUETOOTH_SD == 140)
 
         default:
