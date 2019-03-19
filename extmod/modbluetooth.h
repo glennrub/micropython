@@ -26,6 +26,8 @@
 
 #pragma once
 
+#if MICROPY_PY_BLUETOOTH
+
 #include <stdbool.h>
 #include "bluetooth/bluetooth.h"
 #include "py/obj.h"
@@ -100,3 +102,5 @@ mp_obj_t mp_bt_format_uuid_str(uint8_t *uuid);
 #define MP_BLE_FLAG_READ     (1 << 1)
 #define MP_BLE_FLAG_WRITE    (1 << 3)
 #define MP_BLE_FLAG_NOTIFY   (1 << 4)
+
+#endif // MICROPY_PY_BLUETOOTH
