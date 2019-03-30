@@ -266,7 +266,6 @@ STATIC mp_obj_t socket_connect(mp_obj_t self_in, mp_obj_t addr_in) {
     mod_network_socket_obj_t *self = self_in;
     uint8_t * p_address = NULL;
     mp_uint_t port_or_len = 0;
-#if 0
     // if string, its a character array.
     if (mp_obj_is_str(addr_in)) {
         GET_STR_DATA_LEN(addr_in, str_data, str_len);
@@ -274,9 +273,7 @@ STATIC mp_obj_t socket_connect(mp_obj_t self_in, mp_obj_t addr_in) {
         p_address = (uint8_t *)str_data;
         port_or_len = str_len;
         printf("connect(%s, %u)\n", p_address, port_or_len);
-    } else
-#endif
-    {
+    } else {
         // else if tupple, its an address.
 
         // get address
@@ -512,6 +509,8 @@ STATIC const mp_map_elem_t socket_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_connect), (mp_obj_t)&socket_connect_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_send), (mp_obj_t)&socket_send_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_recv), (mp_obj_t)&socket_recv_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_write), (mp_obj_t)&socket_send_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_read), (mp_obj_t)&socket_recv_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_sendto), (mp_obj_t)&socket_sendto_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_recvfrom), (mp_obj_t)&socket_recvfrom_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_getsockopt), (mp_obj_t)&socket_getsockopt_obj },

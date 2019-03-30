@@ -380,6 +380,7 @@ STATIC int lte_nrf91_socket_getsockopt(mod_network_socket_obj_t *socket, mp_uint
 
 STATIC int lte_nrf91_socket_setsockopt(mod_network_socket_obj_t *socket, mp_uint_t level, mp_uint_t opt, const void *optval, mp_uint_t optlen, int *_errno) {
     printf("level: %u, opt: %u, len: %u\n", level, opt, optlen);
+    printf("optval: %lu\n", *((uint32_t*)optval));
     printf("socket: %u\n", socket->u_param.fileno);
     mp_int_t res = nrf_setsockopt(socket->u_param.fileno, level, opt, optval, optlen);
     if (res < 0) {
@@ -636,6 +637,37 @@ STATIC mp_obj_t lte_nrf91_connect(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(lte_nrf91_connect_obj, lte_nrf91_connect);
 
+STATIC mp_obj_t lte_nrf91_disconnect(mp_obj_t self_in) {
+    int handle = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
+    if (handle < 0)
+    {
+        return mp_const_false;
+    }
+
+    bool success;
+
+    static const char at_cfun4[] = "AT+CFUN=4";
+    success = send_at_command(handle, (uint8_t *)at_cfun4, MP_ARRAY_SIZE(at_cfun4));
+    if (!success) {
+        printf("Error issuing AT+CFUN=4, errno: %d\n", nrf_errno);
+        (void)nrf_close(handle);
+        return mp_const_false;
+    }
+
+    static const char at_cfun1[] = "AT+CFUN=0";
+    success = send_at_command(handle, (uint8_t *)at_cfun1, MP_ARRAY_SIZE(at_cfun1));
+    if (!success) {
+        printf("Error issuing AT+CFUN=0, errno: %d\n", nrf_errno);
+        (void)nrf_close(handle);
+        return mp_const_false;
+    }
+
+    (void)nrf_close(handle);
+
+    return mp_const_true;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(lte_nrf91_disconnect_obj, lte_nrf91_disconnect);
+
 STATIC mp_obj_t lte_nrf91_ifconfig(mp_obj_t self_in) {
     int handle = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
     if (handle < 0)
@@ -714,7 +746,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(lte_nrf91_version_obj, lte_nrf91_version);
 STATIC const mp_rom_map_elem_t lte_nrf91_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_mode),                MP_ROM_PTR(&lte_nrf91_mode_obj) },
     { MP_ROM_QSTR(MP_QSTR_connect),             MP_ROM_PTR(&lte_nrf91_connect_obj) },
-    { MP_ROM_QSTR(MP_QSTR_ifconfig),             MP_ROM_PTR(&lte_nrf91_ifconfig_obj) },
+    { MP_ROM_QSTR(MP_QSTR_disconnect),          MP_ROM_PTR(&lte_nrf91_disconnect_obj) },
+    { MP_ROM_QSTR(MP_QSTR_ifconfig),            MP_ROM_PTR(&lte_nrf91_ifconfig_obj) },
     { MP_ROM_QSTR(MP_QSTR_version),             MP_ROM_PTR(&lte_nrf91_version_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(lte_nrf91_locals_dict, lte_nrf91_locals_dict_table);

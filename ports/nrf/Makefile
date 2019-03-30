@@ -156,11 +156,10 @@ SRC_LIB += $(addprefix lib/,\
 endif
 
 ifeq ($(MCU_VARIANT), nrf91)
-LIBGCC_FILE_NAME = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 LIBBSD_FILE_NAME = $(TOP)/lib/nrfxlib/bsdlib/lib/cortex-m33/hard-float/libbsd_nrf9160_xxaa.a
 LIBOBERON_FILE_NAME = $(TOP)/lib/nrfxlib/crypto/nrf_oberon/lib/cortex-m33/hard-float/liboberon_2.0.7.a
 
-LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lgcc
+LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lc
 LIBS += -L $(dir $(LIBBSD_FILE_NAME)) -lbsd_nrf9160_xxaa
 LIBS += -L $(dir $(LIBOBERON_FILE_NAME)) -loberon_2.0.7
 
@@ -304,7 +303,7 @@ FROZEN_MPY_PY_FILES := $(shell find -L $(FROZEN_MPY_DIR) -type f -name '*.py')
 FROZEN_MPY_MPY_FILES := $(addprefix $(BUILD)/,$(FROZEN_MPY_PY_FILES:.py=.mpy))
 endif
 
-LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lgcc -lc
+LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lgcc
 
 OBJ += $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_MOD:.c=.o))
