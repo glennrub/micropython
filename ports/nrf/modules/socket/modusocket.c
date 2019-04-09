@@ -531,17 +531,11 @@ STATIC const mp_stream_p_t socket_stream_p = {
     .is_text = false,
 };
 
-STATIC void socket_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
-    mod_network_socket_obj_t *self = self_in;
-    mp_printf(print, "socket %d", self->u_param.fileno);
-}
-
 STATIC const mp_obj_type_t socket_type = {
     { &mp_type_type },
     .name = MP_QSTR_socket,
     .make_new = socket_make_new,
     .protocol = &socket_stream_p,
-    .print = socket_print,
     .locals_dict = (mp_obj_t)&socket_locals_dict,
 };
 

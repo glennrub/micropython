@@ -178,6 +178,9 @@
 #define MICROPY_PY_RANDOM_HW_RNG    (0)
 #endif
 
+#ifndef MICROPY_PY_USELECT_POSIX
+#define MICROPY_PY_USELECT_POSIX    (0)
+#endif
 
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (0)
@@ -219,6 +222,7 @@ extern const struct _mp_obj_module_t mp_module_uos;
 extern const struct _mp_obj_module_t mp_module_ubluepy;
 extern const struct _mp_obj_module_t music_module;
 extern const struct _mp_obj_module_t random_module;
+extern const struct _mp_obj_module_t mp_module_uselect;
 
 #if MICROPY_PY_USOCKET
 extern const struct _mp_obj_module_t mp_module_usocket;
@@ -227,6 +231,14 @@ extern const struct _mp_obj_module_t mp_module_usocket;
 #else
 #define SOCKET_BUILTIN_MODULE
 #define SOCKET_BUILTIN_MODULE_WEAK_LINKS
+#endif
+
+#if MICROPY_PY_USELECT_POSIX
+#define MICROPY_PY_USELECT_MODULE            { MP_ROM_QSTR(MP_QSTR_uselect), MP_ROM_PTR(&mp_module_uselect) },
+#define MICROPY_PY_USELECT_MODULE_WEAK_LINKS { MP_ROM_QSTR(MP_QSTR_select), MP_ROM_PTR(&mp_module_uselect) },
+#else
+#define MICROPY_PY_USELECT_MODULE
+#define MICROPY_PY_USELECT_MODULE_WEAK_LINKS
 #endif
 
 #if MICROPY_PY_NETWORK
@@ -295,6 +307,7 @@ extern const struct _mp_obj_module_t ble_module;
     MICROPY_BOARD_BUILTINS \
     SOCKET_BUILTIN_MODULE \
     NETWORK_BUILTIN_MODULE \
+    MICROPY_PY_USELECT_MODULE \
 
 #endif // BLUETOOTH_SD
 
@@ -302,6 +315,7 @@ extern const struct _mp_obj_module_t ble_module;
     { MP_ROM_QSTR(MP_QSTR_os), MP_ROM_PTR(&mp_module_uos) }, \
     { MP_ROM_QSTR(MP_QSTR_time), MP_ROM_PTR(&mp_module_utime) }, \
     SOCKET_BUILTIN_MODULE_WEAK_LINKS \
+    MICROPY_PY_USELECT_MODULE_WEAK_LINKS \
 
 // extra built in names to add to the global namespace
 #define MICROPY_PORT_BUILTINS \

@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "py/mphal.h"
+#include "py/stream.h"
 
 #ifndef MICROPY_PY_LTE_SOCKET
 #define MICROPY_PY_LTE_SOCKET 1
@@ -404,8 +405,13 @@ STATIC int lte_nrf91_socket_settimeout(mod_network_socket_obj_t *socket, mp_uint
 }
 
 STATIC int lte_nrf91_socket_ioctl(mod_network_socket_obj_t *socket, mp_uint_t request, mp_uint_t arg, int *_errno) {
-    *_errno = MP_EINVAL;
-    return -1;
+    switch (request) {
+        case MP_STREAM_GET_FILENO:
+            return socket->u_param.fileno;
+        default:
+            *_errno = MP_EINVAL;
+            return -1;
+    }
 }
 
 char * at_ltrim(char * str, char delimiter)
