@@ -161,7 +161,7 @@ LIBOBERON_FILE_NAME = $(TOP)/lib/nrfxlib/crypto/nrf_oberon/lib/cortex-m33/hard-f
 
 LIBS += -L $(dir $(LIBGCC_FILE_NAME)) -lc
 LIBS += -L $(dir $(LIBBSD_FILE_NAME)) -lbsd_nrf9160_xxaa
-LIBS += -L $(dir $(LIBOBERON_FILE_NAME)) -loberon_2.0.7
+LIBS += -L $(dir $(LIBOBERON_FILE_NAME)) -loberon_3.0.0
 
 INC += -I$(TOP)/lib/nrfxlib/bsdlib/include
 
@@ -191,8 +191,7 @@ SRC_LIB += $(addprefix lib/,\
         )
 
 SRC_C += \
-        drivers/lte/bsd_os.c \
-        mbedtls_mock.c \
+        drivers/lte/bsd_os.c
 
 DRIVERS_SRC_C += $(addprefix modules/,\
         socket/modnetwork.c \

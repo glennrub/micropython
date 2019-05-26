@@ -25,6 +25,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include "py/mphal.h"
@@ -41,6 +42,7 @@
 #if MICROPY_PY_NETWORK && MICROPY_PY_LTE_SOCKET
 
 #include "nrf_socket.h"
+#include "nrf_apn_class.h"
 
 #ifdef MAX
 #undef MAX
@@ -96,9 +98,11 @@ typedef struct _lte_nrf91_obj_t {
 
 STATIC lte_nrf91_obj_t lte_nrf91_obj;
 
-STATIC int lte_nrf91_gethostbyname(mp_obj_t nic, const char *name, mp_uint_t len, uint8_t *out_ip, uint8_t * out_family, uint8_t * out_proto) {
+STATIC int lte_nrf91_gethostbyname(mp_obj_t nic, const char *name, mp_uint_t len, const char *interface, mp_uint_t interface_len, uint8_t *out_ip, uint8_t * out_family, uint8_t * out_proto) {
     struct nrf_addrinfo * p_info;
     struct nrf_addrinfo hints;
+    struct nrf_addrinfo apn_hints;
+
     memset(&hints, 0, sizeof(struct nrf_addrinfo));
     hints.ai_flags = 0;
     hints.ai_family = NRF_AF_INET;
@@ -111,6 +115,15 @@ STATIC int lte_nrf91_gethostbyname(mp_obj_t nic, const char *name, mp_uint_t len
     }    
     hints.ai_socktype = NRF_SOCK_STREAM;
     hints.ai_protocol = 0;
+
+    if ((interface != NULL) && (interface_len > 0)) {
+        apn_hints.ai_family = NRF_AF_LTE;
+        apn_hints.ai_socktype = NRF_SOCK_MGMT;
+        apn_hints.ai_protocol = NRF_PROTO_PDN;
+        apn_hints.ai_canonname = (char *)interface;
+        printf("DNS on APN: %s, %d\n", interface, interface_len);
+        hints.ai_next = &apn_hints;
+    }
 /*char * p_buffer;
     p_buffer = m_new(char, len + 1);
     memset(p_buffer, 0, len + 1);
@@ -204,27 +217,37 @@ STATIC int lte_nrf91_socket_listen(mod_network_socket_obj_t *socket, mp_int_t ba
 
 STATIC int lte_nrf91_socket_accept(mod_network_socket_obj_t *socket, mod_network_socket_obj_t *socket2, byte *ip, mp_uint_t *port, int *_errno) {
     int res = -1;
+    struct nrf_sockaddr_in addr4;
+    struct nrf_sockaddr_in6 addr6;
     if (socket->u_param.domain == MOD_NETWORK_AF_INET) {
-        struct nrf_sockaddr_in addr4;
         nrf_socklen_t addr_len = sizeof(struct nrf_sockaddr_in);
         res = nrf_accept(socket->u_param.fileno, (struct nrf_sockaddr *)&addr4, &addr_len);
         printf("accept res: %d, %d\n", res, nrf_errno);
-        if (res != 0) {
+        if (res < 0) {
             *_errno = nrf_errno;
             return -1;
         }
         printf("Socket connected, on handle: %d\n", res);
     } else if (socket->u_param.domain == MOD_NETWORK_AF_INET6) {
-        struct nrf_sockaddr_in6 addr6;
         nrf_socklen_t addr_len = sizeof(struct nrf_sockaddr_in6);
         res = nrf_accept(socket->u_param.fileno, (struct nrf_sockaddr *)&addr6, &addr_len);
         
-        if (res != 0) {
+        if (res < 0) {
             *_errno = nrf_errno;
             return -1;
         }
     }
     
+    socket2->u_param.fileno = res;
+
+    if (socket->u_param.domain == MOD_NETWORK_AF_INET) {
+        *port = NRF_NTOHS(addr4.sin_port);
+        memcpy(ip, &addr4.sin_addr.s_addr, sizeof(struct nrf_in_addr));
+    } else if (socket->u_param.domain == MOD_NETWORK_AF_INET6) {
+        *port = NRF_NTOHS(addr6.sin6_port);
+        memcpy(ip, (void *)addr6.sin6_addr.s6_addr, sizeof(struct nrf_in6_addr));
+    }
+
     return res;
 }
 
@@ -244,6 +267,9 @@ STATIC int lte_nrf91_socket_connect(mod_network_socket_obj_t *socket, byte *ip, 
         addr6.sin6_port        = NRF_HTONS(port);
         memcpy((void *)addr6.sin6_addr.s6_addr, ip, sizeof(struct nrf_in6_addr));
         res = nrf_connect(socket->u_param.fileno, (struct nrf_sockaddr * )&addr6, sizeof(struct nrf_sockaddr_in6));
+    } else {
+        // If AF_LTE, SOCK_MGMT, PROTO_PDN. Or, similar, pass it raw.
+        res = nrf_connect(socket->u_param.fileno, ip, port);
     }
 
     if (res == -1) {
@@ -529,7 +555,7 @@ STATIC mp_obj_t lte_nrf91_mode(size_t n_args, const mp_obj_t *args) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(lte_nrf91_mode_obj, 1, 2, lte_nrf91_mode);
 
-static char m_result_buffer[128];
+static char m_result_buffer[512];
 
 STATIC bool send_at_command(int handle, uint8_t * cmd, uint16_t cmd_len)
 {
@@ -674,59 +700,124 @@ STATIC mp_obj_t lte_nrf91_disconnect(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(lte_nrf91_disconnect_obj, lte_nrf91_disconnect);
 
-STATIC mp_obj_t lte_nrf91_ifconfig(mp_obj_t self_in) {
+STATIC mp_obj_t lte_nrf91_ifconfig(mp_uint_t n_args, const mp_obj_t *args) {
     int handle = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
     if (handle < 0)
     {
         return mp_const_false;
     }
-    
-    static const char at_cgpaddr[] = "AT+CGPADDR";
-    static char at_cgpaddr_numbered[MP_ARRAY_SIZE(at_cgpaddr) + 3];
 
     mp_obj_t ret_list = mp_obj_new_list(0, NULL);
 
-    for (uint8_t cid = 0; cid < 12; cid++)
-    {
-        memset(m_result_buffer, 0, MP_ARRAY_SIZE(m_result_buffer));
-        snprintf(at_cgpaddr_numbered,
-                MP_ARRAY_SIZE(at_cgpaddr_numbered),
-                "%s=%u",
-                at_cgpaddr, cid);
-        
-        int len = send_at_command_with_result(handle, (uint8_t *)at_cgpaddr_numbered, MP_ARRAY_SIZE(at_cgpaddr_numbered), m_result_buffer, MP_ARRAY_SIZE(m_result_buffer));
-        if (len > 6) {
-            uint16_t cid_length = 0;
-            uint16_t ipv4_length = 0;
-            uint16_t ipv6_length = 0;
+    if (mp_obj_is_int(args[1]) && mp_obj_get_int(args[1]) == 1) {
+        static const char at_cgcontrdp[] = "AT+CGCONTRDP";
+        static char at_cgcontrdp_numbered[MP_ARRAY_SIZE(at_cgcontrdp) + 3];
 
-            char * p_cid = at_token_get(0, m_result_buffer, &cid_length);
-            char * p_ipv4 = at_token_get(1, m_result_buffer, &ipv4_length);
-            char * p_ipv6 = at_token_get(2, m_result_buffer, &ipv6_length);
+        for (uint8_t cid = 0; cid < 12; cid++)
+        {
+            memset(m_result_buffer, 0, MP_ARRAY_SIZE(m_result_buffer));
+            snprintf(at_cgcontrdp_numbered,
+                    MP_ARRAY_SIZE(at_cgcontrdp_numbered),
+                    "%s=%u",
+                    at_cgcontrdp, cid);
+            int len = send_at_command_with_result(handle, (uint8_t *)at_cgcontrdp_numbered, MP_ARRAY_SIZE(at_cgcontrdp_numbered), m_result_buffer, MP_ARRAY_SIZE(m_result_buffer));
 
-            mp_obj_tuple_t *tuple = mp_obj_new_tuple(3, NULL);
-            if ((p_cid != NULL) && (cid_length > 0))  {
-                tuple->items[0] = mp_obj_new_str(p_cid, cid_length);
-            }
-            if ((p_ipv4 != NULL) && (ipv4_length > 7)) {
-                tuple->items[1] = mp_obj_new_str(p_ipv4 + 1, ipv4_length - 2); // Hack to get rid of quotes
-            } else {
-                tuple->items[1] = mp_const_none;
-            }
-            if ((p_ipv6 != NULL) && (ipv6_length > 4)) {
-                tuple->items[2] = mp_obj_new_str(p_ipv6 + 1, ipv6_length - 2); // Hack to get rid of quotes
-            } else {
-                tuple->items[2] = mp_const_none;
-            }
+            char * buffer = m_result_buffer;
+            int remaining_len = len;
 
-            mp_obj_list_append(ret_list, tuple);
+            while ((remaining_len > 10) && (buffer != NULL)) {
+                uint16_t cid_length = 0;
+                uint16_t apn_length = 0;
+                uint16_t dns_prim_addr_length = 0;
+                uint16_t dns_sec_addr_length = 0;
+                uint16_t ipv4_mtu_size_length = 0;
+
+                char * p_cid = at_token_get(0, buffer, &cid_length);
+                char * p_apn = at_token_get(2, buffer, &apn_length);
+                char * p_dns_prim_addr = at_token_get(5, buffer, &dns_prim_addr_length);
+                char * p_dns_sec_addr = at_token_get(6, buffer, &dns_sec_addr_length);
+                char * p_ipv4_mtu_size = at_token_get(11, buffer, &ipv4_mtu_size_length);
+
+                mp_obj_tuple_t *tuple = mp_obj_new_tuple(5, NULL);
+                if ((p_cid != NULL) && (cid_length > 0))  {
+                    tuple->items[0] = mp_obj_new_str(p_cid, cid_length);
+                }
+                if ((p_apn != NULL) && (apn_length > 1)) {
+                    tuple->items[1] = mp_obj_new_str(p_apn + 1, apn_length - 2); // Hack to get rid of quotes
+                } else {
+                    tuple->items[1] = mp_const_none;
+                }
+                if ((p_dns_prim_addr != NULL) && (dns_prim_addr_length > 7)) {
+                    tuple->items[2] = mp_obj_new_str(p_dns_prim_addr + 1, dns_prim_addr_length - 2); // Hack to get rid of quotes
+                } else {
+                    tuple->items[2] = mp_const_none;
+                }
+                if ((p_dns_sec_addr != NULL) && (dns_sec_addr_length > 7)) {
+                    tuple->items[3] = mp_obj_new_str(p_dns_sec_addr + 1, dns_sec_addr_length - 2); // Hack to get rid of quotes
+                } else {
+                    tuple->items[3] = mp_const_none;
+                }
+                if ((p_ipv4_mtu_size != NULL) && (ipv4_mtu_size_length > 0)) {
+                    tuple->items[4] = mp_obj_new_int(atoi(p_ipv4_mtu_size));
+                } else {
+                    tuple->items[4] = mp_const_none;
+                }
+                mp_obj_list_append(ret_list, tuple);
+
+                buffer = strstr(buffer, "\r\n");
+                if (buffer != NULL) {
+                    buffer += 2; // Increment \r\n.
+                    uint32_t offset = ((uint32_t)buffer - (uint32_t)&m_result_buffer[0]);
+                    remaining_len = len - offset;
+                }
+            }
+        }
+    } else {
+        static const char at_cgpaddr[] = "AT+CGPADDR";
+        static char at_cgpaddr_numbered[MP_ARRAY_SIZE(at_cgpaddr) + 3];
+
+        for (uint8_t cid = 0; cid < 12; cid++)
+        {
+            memset(m_result_buffer, 0, MP_ARRAY_SIZE(m_result_buffer));
+            snprintf(at_cgpaddr_numbered,
+                    MP_ARRAY_SIZE(at_cgpaddr_numbered),
+                    "%s=%u",
+                    at_cgpaddr, cid);
+
+            int len = send_at_command_with_result(handle, (uint8_t *)at_cgpaddr_numbered, MP_ARRAY_SIZE(at_cgpaddr_numbered), m_result_buffer, MP_ARRAY_SIZE(m_result_buffer));
+            if (len > 6) {
+                uint16_t cid_length = 0;
+                uint16_t ipv4_length = 0;
+                uint16_t ipv6_length = 0;
+
+                char * p_cid = at_token_get(0, m_result_buffer, &cid_length);
+                char * p_ipv4 = at_token_get(1, m_result_buffer, &ipv4_length);
+                char * p_ipv6 = at_token_get(2, m_result_buffer, &ipv6_length);
+
+                mp_obj_tuple_t *tuple = mp_obj_new_tuple(3, NULL);
+                if ((p_cid != NULL) && (cid_length > 0))  {
+                    tuple->items[0] = mp_obj_new_str(p_cid, cid_length);
+                }
+                if ((p_ipv4 != NULL) && (ipv4_length > 7)) {
+                    tuple->items[1] = mp_obj_new_str(p_ipv4 + 1, ipv4_length - 2); // Hack to get rid of quotes
+                } else {
+                    tuple->items[1] = mp_const_none;
+                }
+                if ((p_ipv6 != NULL) && (ipv6_length > 4)) {
+                    tuple->items[2] = mp_obj_new_str(p_ipv6 + 1, ipv6_length - 2); // Hack to get rid of quotes
+                } else {
+                    tuple->items[2] = mp_const_none;
+                }
+
+                mp_obj_list_append(ret_list, tuple);
+            }
         }
     }
     (void)nrf_close(handle);
 
     return ret_list;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(lte_nrf91_ifconfig_obj, lte_nrf91_ifconfig);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(lte_nrf91_ifconfig_obj, 1, 2, lte_nrf91_ifconfig);
 
 STATIC mp_obj_t lte_nrf91_version(mp_obj_t self_in) {
     int handle = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
@@ -748,6 +839,40 @@ STATIC mp_obj_t lte_nrf91_version(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(lte_nrf91_version_obj, lte_nrf91_version);
 
+STATIC mp_obj_t lte_nrf91_apn_class(mp_uint_t n_args, const mp_obj_t *args) {
+    mp_obj_t retval = mp_const_none;
+    if (n_args == 2)
+    {
+        if (mp_obj_is_int(args[1])) {
+            uint8_t * p_buffer;
+            uint16_t buffer_len = 64;
+
+            p_buffer = m_new(uint8_t, buffer_len);
+            memset(p_buffer, 0, buffer_len);
+
+            int result = nrf_apn_class_read(mp_obj_get_int(args[1]), p_buffer, &buffer_len);
+
+            if ((result == 0) && (buffer_len > 0)) {
+                retval = mp_obj_new_str((char *)p_buffer, buffer_len);
+            }
+
+            m_free(p_buffer);
+        }
+    } else if (n_args == 3) {
+        if (mp_obj_is_int(args[1]) && mp_obj_is_str(args[2])) {
+            mp_uint_t apn_name_len;
+            const char *apn_name = mp_obj_str_get_data(args[2], &apn_name_len);
+            int result = nrf_apn_class_update(mp_obj_get_int(args[1]), (uint8_t *)apn_name, apn_name_len);
+            if (result == 0) {
+                retval = mp_const_true;
+            } else {
+                retval = mp_const_false;
+            }
+        }
+    }
+    return retval;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(lte_nrf91_apn_class_obj, 2, 3, lte_nrf91_apn_class);
 
 STATIC const mp_rom_map_elem_t lte_nrf91_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_mode),                MP_ROM_PTR(&lte_nrf91_mode_obj) },
@@ -755,6 +880,7 @@ STATIC const mp_rom_map_elem_t lte_nrf91_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_disconnect),          MP_ROM_PTR(&lte_nrf91_disconnect_obj) },
     { MP_ROM_QSTR(MP_QSTR_ifconfig),            MP_ROM_PTR(&lte_nrf91_ifconfig_obj) },
     { MP_ROM_QSTR(MP_QSTR_version),             MP_ROM_PTR(&lte_nrf91_version_obj) },
+    { MP_ROM_QSTR(MP_QSTR_apn_class),           MP_ROM_PTR(&lte_nrf91_apn_class_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(lte_nrf91_locals_dict, lte_nrf91_locals_dict_table);
 

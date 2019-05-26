@@ -40,7 +40,7 @@ typedef struct _mod_network_nic_type_t {
     mp_obj_type_t base;
 
     // API for non-socket operations
-    int (*gethostbyname)(mp_obj_t nic, const char *name, mp_uint_t len, uint8_t *ip_out, uint8_t *out_family, uint8_t *out_proto);
+    int (*gethostbyname)(mp_obj_t nic, const char *name, mp_uint_t len, const char *interface, mp_uint_t interface_len, uint8_t *ip_out, uint8_t *out_family, uint8_t *out_proto);
 
     // API for socket operations; return -1 on error
     int (*socket)(struct _mod_network_socket_obj_t *socket, int *_errno);

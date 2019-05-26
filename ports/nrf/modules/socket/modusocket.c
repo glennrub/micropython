@@ -238,8 +238,8 @@ STATIC mp_obj_t socket_accept(mp_obj_t self_in) {
     uint8_t ip[MOD_NETWORK_IPADDR_BUF_SIZE];
     mp_uint_t port;
 
-    int _errno;
-    if (self->nic_type->accept(self, socket2, ip, &port, &_errno) != 0) {
+    int _errno = 0;
+    if (self->nic_type->accept(self, socket2, ip, &port, &_errno) < 0) {
         raise_os_errno(_errno);
     }
 
@@ -542,12 +542,17 @@ STATIC const mp_obj_type_t socket_type = {
 /******************************************************************************/
 // usocket module
 
-// function usocket.getaddrinfo(host, port)
-STATIC mp_obj_t mod_usocket_getaddrinfo(mp_obj_t host_in, mp_obj_t port_in) {
+// function usocket.getaddrinfo(host, port, [interface_name])
+STATIC mp_obj_t mod_usocket_getaddrinfo(mp_uint_t n_args, const mp_obj_t *args) {
     mp_uint_t hlen;
-    const char *host = mp_obj_str_get_data(host_in, &hlen);
-    mp_int_t port = mp_obj_get_int(port_in);
+    const char *host = mp_obj_str_get_data(args[0], &hlen);
+    mp_int_t port = mp_obj_get_int(args[1]);
 
+    mp_uint_t interface_len = 0;
+    const char *interface = NULL;
+    if (mp_obj_is_str(args[2])) {
+        interface = mp_obj_str_get_data(args[2], &interface_len);
+    }
     // find a NIC that can do a name lookup
     for (mp_uint_t i = 0; i < MP_STATE_PORT(mod_network_nic_list).len; i++) {
                 mp_obj_t nic = MP_STATE_PORT(mod_network_nic_list).items[i];
@@ -560,7 +565,7 @@ STATIC mp_obj_t mod_usocket_getaddrinfo(mp_obj_t host_in, mp_obj_t port_in) {
 
             mp_obj_t ret_list = mp_obj_new_list(0, NULL);
 
-            if ((result_ipv4 = nic_type->gethostbyname(nic, host, hlen, ipv4_out_ip, &ipv4_out_family, &ipv4_out_proto)) == 0) {
+            if ((result_ipv4 = nic_type->gethostbyname(nic, host, hlen, interface, interface_len, ipv4_out_ip, &ipv4_out_family, &ipv4_out_proto)) == 0) {
                 mp_obj_tuple_t *tuple = mp_obj_new_tuple(5, NULL);
                 tuple->items[0] = MP_OBJ_NEW_SMALL_INT(MOD_NETWORK_AF_INET);
                 tuple->items[1] = MP_OBJ_NEW_SMALL_INT(MOD_NETWORK_SOCK_STREAM);
@@ -574,7 +579,7 @@ STATIC mp_obj_t mod_usocket_getaddrinfo(mp_obj_t host_in, mp_obj_t port_in) {
             uint8_t ipv6_out_family = MOD_NETWORK_AF_INET6;
             uint8_t ipv6_out_proto = 0;
             int result_ipv6 = -1;
-            if ((result_ipv6 = nic_type->gethostbyname(nic, host, hlen, ipv6_out_ip, &ipv6_out_family, &ipv6_out_proto)) == 0) {
+            if ((result_ipv6 = nic_type->gethostbyname(nic, host, hlen, interface, interface_len, ipv6_out_ip, &ipv6_out_family, &ipv6_out_proto)) == 0) {
                 mp_obj_tuple_t *tuple = mp_obj_new_tuple(5, NULL);
                 tuple->items[0] = MP_OBJ_NEW_SMALL_INT(MOD_NETWORK_AF_INET6);
                 tuple->items[1] = MP_OBJ_NEW_SMALL_INT(MOD_NETWORK_SOCK_STREAM);
@@ -595,7 +600,7 @@ STATIC mp_obj_t mod_usocket_getaddrinfo(mp_obj_t host_in, mp_obj_t port_in) {
 
     nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, "no available NIC"));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_usocket_getaddrinfo_obj, mod_usocket_getaddrinfo);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_usocket_getaddrinfo_obj, 2, 3, mod_usocket_getaddrinfo);
 
 STATIC const mp_map_elem_t mp_module_usocket_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_usocket) },
@@ -657,7 +662,6 @@ STATIC const mp_map_elem_t mp_module_usocket_globals_table[] = {
 
 #if EXTENDED_SOCKET
     { MP_OBJ_NEW_QSTR(MP_QSTR_SO_PDN_AF), MP_OBJ_NEW_SMALL_INT(NRF_SO_PDN_AF) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_SO_PDN_CLASS), MP_OBJ_NEW_SMALL_INT(NRF_SO_PDN_CLASS) },
 
     { MP_OBJ_NEW_QSTR(MP_QSTR_SO_DFU_FW_VERSION), MP_OBJ_NEW_SMALL_INT(NRF_SO_DFU_FW_VERSION) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_SO_DFU_RESOURCES), MP_OBJ_NEW_SMALL_INT(NRF_SO_DFU_RESOURCES) },
