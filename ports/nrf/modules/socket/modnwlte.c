@@ -147,9 +147,10 @@ STATIC int lte_nrf91_gethostbyname(mp_obj_t nic, const char *name, mp_uint_t len
         }
 
         nrf_freeaddrinfo(p_info);
+        return 0;
     }
 
-    return 0;
+    return -1;
 }
 
 STATIC int lte_nrf91_socket_socket(mod_network_socket_obj_t *socket, int *_errno) {
