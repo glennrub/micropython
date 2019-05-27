@@ -25,7 +25,7 @@
  * THE SOFTWARE.
  */
 
-#define MOD_NETWORK_IPADDR_BUF_SIZE (16)
+#define MOD_NETWORK_IPADDR_BUF_SIZE (sizeof(nrf_in6_addr))
 
 #define MOD_NETWORK_AF_INET (2)
 #define MOD_NETWORK_AF_INET6 (10)

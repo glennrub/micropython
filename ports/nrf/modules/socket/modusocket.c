@@ -35,7 +35,6 @@
 #include "py/runtime.h"
 #include "py/mperrno.h"
 #include "py/stream.h"
-#include "netutils.h"
 #include "modnetwork.h"
 #include "nrf_socket.h"
 #include "nrf_errno.h"
@@ -179,24 +178,41 @@ STATIC mp_obj_t socket_close(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(socket_close_obj, socket_close);
 
+static mp_uint_t parse_ip_addr(mp_uint_t family_in, mp_obj_t addr_in, void * addr_out) {
+
+    mp_obj_t *items;
+    mp_obj_get_array_fixed_n(addr_in, 2, &items);
+
+    mp_uint_t addr_len;
+    const char *addr_str = mp_obj_str_get_data(items[0], &addr_len);
+
+    nrf_inet_pton(family_in, addr_str, addr_out);
+
+    return mp_obj_get_int(items[1]);
+}
+
+static mp_obj_t format_ip_addr(mp_uint_t family_in, void * addr_in, mp_uint_t port_in) {
+    char addr_str[NRF_INET6_ADDRSTRLEN];
+    const char * result = nrf_inet_ntop(family_in, addr_in, addr_str, sizeof(addr_str));
+
+    mp_obj_t tuple[2] = {
+        tuple[0] = mp_obj_new_str(result, strlen(result)),
+        tuple[1] = mp_obj_new_int(port_in),
+    };
+
+    return mp_obj_new_tuple(2, tuple);
+}
 
 // method socket.bind(address)
 STATIC mp_obj_t socket_bind(mp_obj_t self_in, mp_obj_t addr_in) {
     mod_network_socket_obj_t *self = self_in;
 
-    // get address
-    uint8_t ip[MOD_NETWORK_IPADDR_BUF_SIZE];
-
-    mp_uint_t port;
-    if (self->u_param.domain == MOD_NETWORK_AF_INET) {
-        port = netutils_parse_inet_addr(addr_in, ip, NETUTILS_BIG);
-    } else {
-        port = netutils_parse_inet6_addr(addr_in, ip, NETUTILS_BIG);
-    }
+    byte addr[NRF_INET6_ADDRSTRLEN];
+    mp_uint_t port = parse_ip_addr(self->u_param.domain, addr_in, addr);
 
     // call the NIC to bind the socket
     int _errno;
-    if (self->nic_type->bind(self, ip, port, &_errno) != 0) {
+    if (self->nic_type->bind(self, (uint8_t *)&addr, port, &_errno) != 0) {
         raise_os_errno(_errno);
     }
 
@@ -250,12 +266,7 @@ STATIC mp_obj_t socket_accept(mp_obj_t self_in) {
     // make the return value
     mp_obj_tuple_t *client = mp_obj_new_tuple(2, NULL);
     client->items[0] = socket2;
-
-    if (self->u_param.domain == MOD_NETWORK_AF_INET) {
-        client->items[1] = netutils_format_inet_addr(ip, port, NETUTILS_BIG);
-    } else {
-        client->items[1] = netutils_format_inet6_addr(ip, port, NETUTILS_BIG);
-    }
+    client->items[1] = format_ip_addr(self->u_param.domain, ip, port);
 
     return client;
 }
@@ -264,26 +275,23 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(socket_accept_obj, socket_accept);
 // method socket.connect(address)
 STATIC mp_obj_t socket_connect(mp_obj_t self_in, mp_obj_t addr_in) {
     mod_network_socket_obj_t *self = self_in;
-    uint8_t * p_address = NULL;
+    byte * p_address = NULL;
+    byte addr[MOD_NETWORK_IPADDR_BUF_SIZE];
+
     mp_uint_t port_or_len = 0;
     // if string, its a character array.
     if (mp_obj_is_str(addr_in)) {
         GET_STR_DATA_LEN(addr_in, str_data, str_len);
 
-        p_address = (uint8_t *)str_data;
+        p_address = (byte *)str_data;
         port_or_len = str_len;
         printf("connect(%s, %u)\n", p_address, port_or_len);
     } else {
         // else if tupple, its an address.
 
         // get address
-        uint8_t ip[MOD_NETWORK_IPADDR_BUF_SIZE];
-        p_address = ip;
-        if (self->u_param.domain == MOD_NETWORK_AF_INET) {
-            port_or_len = netutils_parse_inet_addr(addr_in, ip, NETUTILS_BIG);
-        } else {
-            port_or_len = netutils_parse_inet6_addr(addr_in, ip, NETUTILS_BIG);
-        }
+        port_or_len = parse_ip_addr(self->u_param.domain, addr_in, addr);
+        p_address = addr;
     }
 
     // call the NIC to connect the socket
@@ -346,20 +354,15 @@ STATIC mp_obj_t socket_sendto(mp_obj_t self_in, mp_obj_t data_in, mp_obj_t addr_
     mp_get_buffer_raise(data_in, &bufinfo, MP_BUFFER_READ);
 
     // get address
-    uint8_t ip[MOD_NETWORK_IPADDR_BUF_SIZE];
-    mp_uint_t port;
-    if (self->u_param.domain == MOD_NETWORK_AF_INET) {
-        port = netutils_parse_inet_addr(addr_in, ip, NETUTILS_BIG);
-    } else {
-        port = netutils_parse_inet6_addr(addr_in, ip, NETUTILS_BIG);
-    }
+    byte addr[MOD_NETWORK_IPADDR_BUF_SIZE];
+    mp_uint_t port = parse_ip_addr(self->u_param.domain, addr_in, addr);
 
     // check if we need to select a NIC
-    socket_select_nic(self, ip);
+    socket_select_nic(self, addr);
 
     // call the NIC to sendto
     int _errno;
-    mp_int_t ret = self->nic_type->sendto(self, bufinfo.buf, bufinfo.len, ip, port, &_errno);
+    mp_int_t ret = self->nic_type->sendto(self, bufinfo.buf, bufinfo.len, addr, port, &_errno);
     if (ret == -1) {
         mp_raise_OSError(_errno);
     }
@@ -377,10 +380,10 @@ STATIC mp_obj_t socket_recvfrom(mp_obj_t self_in, mp_obj_t len_in) {
     }
     vstr_t vstr;
     vstr_init_len(&vstr, mp_obj_get_int(len_in));
-    byte ip[4];
+    byte addr[MOD_NETWORK_IPADDR_BUF_SIZE];
     mp_uint_t port;
     int _errno;
-    mp_int_t ret = self->nic_type->recvfrom(self, (byte*)vstr.buf, vstr.len, ip, &port, &_errno);
+    mp_int_t ret = self->nic_type->recvfrom(self, (byte*)vstr.buf, vstr.len, addr, &port, &_errno);
     if (ret == -1) {
         mp_raise_OSError(_errno);
     }
@@ -392,11 +395,8 @@ STATIC mp_obj_t socket_recvfrom(mp_obj_t self_in, mp_obj_t len_in) {
         tuple[0] = mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
     }
 
-    if (self->u_param.domain == MOD_NETWORK_AF_INET) {
-        tuple[1] = netutils_format_inet_addr(ip, port, NETUTILS_BIG);
-    } else {
-        tuple[1] = netutils_format_inet6_addr(ip, port, NETUTILS_BIG);
-    }
+    tuple[1] = format_ip_addr(self->u_param.domain, addr, port);
+
     return mp_obj_new_tuple(2, tuple);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(socket_recvfrom_obj, socket_recvfrom);
@@ -558,7 +558,7 @@ STATIC mp_obj_t mod_usocket_getaddrinfo(mp_uint_t n_args, const mp_obj_t *args) 
                 mp_obj_t nic = MP_STATE_PORT(mod_network_nic_list).items[i];
         mod_network_nic_type_t *nic_type = (mod_network_nic_type_t*)mp_obj_get_type(nic);
         if (nic_type->gethostbyname != NULL) {
-            uint8_t ipv4_out_ip[MOD_NETWORK_IPADDR_BUF_SIZE];
+            byte ipv4_out_ip[MOD_NETWORK_IPADDR_BUF_SIZE];
             uint8_t ipv4_out_family = MOD_NETWORK_AF_INET;
             uint8_t ipv4_out_proto = 0;
             int result_ipv4 = -1;
@@ -571,11 +571,11 @@ STATIC mp_obj_t mod_usocket_getaddrinfo(mp_uint_t n_args, const mp_obj_t *args) 
                 tuple->items[1] = MP_OBJ_NEW_SMALL_INT(MOD_NETWORK_SOCK_STREAM);
                 tuple->items[2] = MP_OBJ_NEW_SMALL_INT(0);
                 tuple->items[3] = MP_OBJ_NEW_QSTR(MP_QSTR_);
-                tuple->items[4] = netutils_format_inet_addr(ipv4_out_ip, port, NETUTILS_BIG);
+                tuple->items[4] = format_ip_addr(ipv4_out_family, ipv4_out_ip, port);
                 mp_obj_list_append(ret_list, tuple);
             }
             
-            uint8_t ipv6_out_ip[MOD_NETWORK_IPADDR_BUF_SIZE];
+            byte ipv6_out_ip[MOD_NETWORK_IPADDR_BUF_SIZE];
             uint8_t ipv6_out_family = MOD_NETWORK_AF_INET6;
             uint8_t ipv6_out_proto = 0;
             int result_ipv6 = -1;
@@ -585,7 +585,7 @@ STATIC mp_obj_t mod_usocket_getaddrinfo(mp_uint_t n_args, const mp_obj_t *args) 
                 tuple->items[1] = MP_OBJ_NEW_SMALL_INT(MOD_NETWORK_SOCK_STREAM);
                 tuple->items[2] = MP_OBJ_NEW_SMALL_INT(0);
                 tuple->items[3] = MP_OBJ_NEW_QSTR(MP_QSTR_);
-                tuple->items[4] = netutils_format_inet6_addr(ipv6_out_ip, port, NETUTILS_BIG);
+                tuple->items[4] = format_ip_addr(ipv6_out_family, ipv6_out_ip, port);
                 mp_obj_list_append(ret_list, tuple);
             }
 

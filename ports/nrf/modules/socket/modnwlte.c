@@ -58,7 +58,6 @@
 #include "py/mperrno.h"
 
 
-#include "netutils.h"
 #include "modnetwork.h"
 #include "pin.h"
 #include "genhdr/pins.h"
