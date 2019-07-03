@@ -709,7 +709,7 @@ STATIC mp_obj_t lte_nrf91_ifconfig(mp_uint_t n_args, const mp_obj_t *args) {
 
     mp_obj_t ret_list = mp_obj_new_list(0, NULL);
 
-    if (mp_obj_is_int(args[1]) && mp_obj_get_int(args[1]) == 1) {
+    if ((n_args == 2) && mp_obj_is_int(args[1]) && mp_obj_get_int(args[1]) == 1) {
         static const char at_cgcontrdp[] = "AT+CGCONTRDP";
         static char at_cgcontrdp_numbered[MP_ARRAY_SIZE(at_cgcontrdp) + 3];
 

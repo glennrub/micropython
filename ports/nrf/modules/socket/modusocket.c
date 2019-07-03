@@ -550,7 +550,7 @@ STATIC mp_obj_t mod_usocket_getaddrinfo(mp_uint_t n_args, const mp_obj_t *args) 
 
     mp_uint_t interface_len = 0;
     const char *interface = NULL;
-    if (mp_obj_is_str(args[2])) {
+    if ((n_args == 3) && mp_obj_is_str(args[2])) {
         interface = mp_obj_str_get_data(args[2], &interface_len);
     }
     // find a NIC that can do a name lookup
