@@ -27,6 +27,37 @@
 #include <arm_cmse.h>
 #include <nrf.h>
 
+#define SECUREBOOT_TDFU (1)
+
+#if SECUREBOOT_TDFU
+#include <string.h>
+#include "nrf_gpio.h"
+#include "nrfx_uarte.h"
+#include "nrfx_nvmc.h"
+#include "mpconfigboard.h"
+
+#if defined(PCA10090)
+#define SECUREBOOT_TDFU_BUTTON         (6)
+#define SECUREBOOT_TDFU_BUTTON_PULLUP  (1)
+#define SECUREBOOT_TDFU_LED            (MICROPY_HW_LED4)
+#define SECUREBOOT_TDFU_LED_PULLUP     (MICROPY_HW_LED_PULLUP)
+#define SECUREBOOT_TDFU_BAUDRATE       1000000
+#elif defined(PCA20035)
+#define SECUREBOOT_TDFU_BUTTON         (26)
+#define SECUREBOOT_TDFU_BUTTON_PULLUP  (1)
+#define SECUREBOOT_TDFU_LED            (MICROPY_HW_LED3)
+#define SECUREBOOT_TDFU_LED_PULLUP     (MICROPY_HW_LED_PULLUP)
+#define SECUREBOOT_TDFU_BAUDRATE       115200
+#else
+#define SECUREBOOT_TDFU_BUTTON         (5)
+#define SECUREBOOT_TDFU_BUTTON_PULLUP  (1)
+#define SECUREBOOT_TDFU_LED            (MICROPY_HW_LED3)
+#define SECUREBOOT_TDFU_LED_PULLUP     (MICROPY_HW_LED_PULLUP)
+#define SECUREBOOT_TDFU_BAUDRATE       1000000
+#endif
+
+#endif
+
 // Secure flash 32K.
 #define SECURE_32K_FLASH_PAGE_START    (0)
 #define SECURE_32K_FLASH_PAGE_END      (0)
@@ -176,7 +207,230 @@ static void jump_to_non_secure(void)
     }
 }
 
+#if SECUREBOOT_TDFU
+
+#ifdef PCA10090
+static void delay_us(uint32_t us)
+{
+    if (us == 0) {
+        return;
+    }
+    register uint32_t delay __ASM ("r0") = us;
+    __ASM volatile (
+        "1:\n"
+        " SUBS %0, %0, #1\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " BNE 1b\n"
+        : "+r" (delay));
+}
+
+static void delay_ms(uint32_t ms)
+{
+    for (uint32_t i = 0; i < ms; i++)
+    {
+        delay_us(999);
+    }
+}
+#endif
+
+static const nrfx_uarte_t uarte_instance = NRFX_UARTE_INSTANCE(0);
+
+uint8_t uart_rx_char(void) {
+    uint8_t ch;
+    nrfx_uarte_rx(&uarte_instance, &ch, 1);
+    return ch;
+}
+
+void uart_tx_char(char c) {
+    nrfx_uarte_tx(&uarte_instance, (uint8_t *)&c, 1);
+}
+
+void uart_tx_string(char * p_str, uint16_t str_len) {
+    nrfx_uarte_tx(&uarte_instance, (uint8_t *)p_str, str_len);
+}
+
+void secureboot_tdfu(void) {
+#ifdef PCA10090
+    delay_ms(200);
+#endif
+    nrf_gpio_cfg_input(SECUREBOOT_TDFU_BUTTON,
+                       (SECUREBOOT_TDFU_BUTTON_PULLUP)
+                       ? NRF_GPIO_PIN_PULLUP
+                       : NRF_GPIO_PIN_PULLDOWN);
+
+    uint32_t button_value = nrf_gpio_pin_read(SECUREBOOT_TDFU_BUTTON);
+    bool enter_tdfu = (SECUREBOOT_TDFU_BUTTON_PULLUP)
+                    ? (~button_value & 0x1)
+                    : (button_value & 0x1);
+
+    if (enter_tdfu) {
+
+        nrf_gpio_cfg_output(SECUREBOOT_TDFU_LED);
+        if (SECUREBOOT_TDFU_LED_PULLUP) {
+            nrf_gpio_pin_clear(SECUREBOOT_TDFU_LED);
+        } else {
+            nrf_gpio_pin_set(SECUREBOOT_TDFU_LED);
+        }
+
+        nrfx_uarte_config_t config;
+        config.hwfc               = NRF_UARTE_HWFC_ENABLED;
+        config.parity             = NRF_UARTE_PARITY_EXCLUDED;
+        config.interrupt_priority = 1;
+        uint32_t baudrate = SECUREBOOT_TDFU_BAUDRATE;
+
+        // Magic: calculate 'baudrate' register from the input number.
+        // Every value listed in the datasheet will be converted to the
+        // correct register value, except for 192600. I believe the value
+        // listed in the nrf52 datasheet (0x0EBED000) is incorrectly rounded
+        // and should be 0x0EBEE000, as the nrf51 datasheet lists the
+        // nonrounded value 0x0EBEDFA4.
+        // Some background:
+        // https://devzone.nordicsemi.com/f/nordic-q-a/391/uart-baudrate-register-values/2046#2046
+        config.baudrate = baudrate / 400 * (uint32_t)(400ULL * (uint64_t)UINT32_MAX / 16000000ULL);
+        config.baudrate = (config.baudrate + 0x800) & 0xffffff000; // rounding
+
+        config.pseltxd = MICROPY_HW_UART1_TX;
+        config.pselrxd = MICROPY_HW_UART1_RX;
+#if MICROPY_HW_UART1_HWFC
+        config.pselrts = MICROPY_HW_UART1_RTS;
+        config.pselcts = MICROPY_HW_UART1_CTS;
+#endif
+        config.p_context = NULL;
+
+        nrfx_uarte_init(&uarte_instance, &config, NULL);
+
+        bool hold = true;
+        do {
+            button_value = nrf_gpio_pin_read(SECUREBOOT_TDFU_BUTTON);
+            hold = (SECUREBOOT_TDFU_BUTTON_PULLUP)
+                 ? (~button_value & 0x1)
+                 : (button_value & 0x1);
+        } while (hold);
+
+        char secureboot_string[] = "Secureboot TDFU\r\n";
+        uart_tx_string(secureboot_string, strlen(secureboot_string));
+
+        // Echo a char from sender, to acknowledge we are in sync.
+        char c;
+        nrfx_uarte_rx(&uarte_instance, (uint8_t *)&c, sizeof(char));
+        uart_tx_char(c);
+
+        uint32_t image_len = 0;
+        nrfx_uarte_rx(&uarte_instance, (uint8_t *)&image_len, sizeof(uint32_t));
+        uint16_t fragment_size = 0;
+        nrfx_uarte_rx(&uarte_instance, (uint8_t *)&fragment_size, sizeof(uint16_t));
+
+        uint16_t pages = image_len / 4096;
+        uint16_t leftover = (image_len % 4096);
+        uint16_t all_pages = pages + ((leftover) ? 1 : 0);
+        uint16_t full_fragments = image_len / fragment_size;
+        uint16_t leftover_fragment = image_len % fragment_size;
+        uint32_t start_addr = (32768 * NONSECURE_32K_FLASH_PAGE_START);
+
+        // Erase pages.
+        for (int i = 0; i < all_pages; i++) {
+            nrfx_err_t err = nrfx_nvmc_page_erase(start_addr + (i * 4096));
+            if (err != NRFX_SUCCESS) {
+                uart_tx_char('F');
+                goto cleanup;
+            }
+        }
+
+        if (all_pages) {
+            uart_tx_char('E');
+        } else {
+            uart_tx_char('P');
+        }
+
+        // Start receive full pages.
+        uint8_t buffer[4096];
+
+        for (int i = 0; i < full_fragments; i++) {
+            nrfx_uarte_rx(&uarte_instance, buffer, fragment_size);
+            uint32_t write_addr = start_addr + (i * fragment_size);
+            nrfx_nvmc_bytes_write(write_addr, buffer, fragment_size);
+            uart_tx_char('A');
+        }
+
+        if (leftover_fragment) {
+            nrfx_uarte_rx(&uarte_instance, (uint8_t *)buffer, leftover_fragment);
+            uint32_t write_addr = start_addr + (full_fragments * fragment_size);
+            nrfx_nvmc_bytes_write(write_addr, buffer, leftover_fragment);
+            uart_tx_char('A');
+        }
+
+cleanup:
+        uart_tx_char('D');
+        // Clean up UARTE before leaving secure domain.
+        nrfx_uarte_uninit(&uarte_instance);
+    }
+
+    // Cleanup use of GPIO before leaving secure domain.
+    nrf_gpio_input_disconnect(SECUREBOOT_TDFU_BUTTON);
+}
+#endif
+
 int main(void) {
+#if SECUREBOOT_TDFU
+    secureboot_tdfu();
+#endif
     configure_flash();
     configure_ram();
     configure_peripherals();

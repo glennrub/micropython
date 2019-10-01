@@ -12,10 +12,19 @@ SRC_SECUREBOOT += $(addprefix $(TOP)/lib/nrfx/mdk/,\
         system_nrf9160.c \
         )
 
-.PHONY: secureboot clean
+SRC_SECUREBOOT += $(addprefix $(TOP)/lib/nrfx/drivers/src/,\
+        nrfx_uarte.c \
+        nrfx_nvmc.c \
+        )
 
+.PHONY: secureboot clean
+INC_SECUREBOOT += -I$(DRIVERS_SECUREBOOT_DIR)
 INC_SECUREBOOT += -I./../../lib/nrfx/mdk
 INC_SECUREBOOT += -I./../../lib/cmsis/inc
+INC_SECUREBOOT += -Iboards/$(BOARD)
+INC_SECUREBOOT += -I$(TOP)/lib/nrfx
+INC_SECUREBOOT += -I$(TOP)/lib/nrfx/hal
+INC_SECUREBOOT += -I$(TOP)/lib/nrfx/drivers/include
 
 MCU_SERIES = m33
 
@@ -26,7 +35,7 @@ CFLAGS_MCU_m33 = $(CFLAGS_CORTEX_M) -mcpu=cortex-m33 -march=armv8-m.main+dsp -mc
 
 CFLAGS_SECUREBOOT += -DNRF9160_XXAA
 CFLAGS_SECUREBOOT += $(CFLAGS_MCU_$(MCU_SERIES))
-CFLAGS_SECUREBOOT += $(INC) -Wall -Werror -g -ansi -std=c11 -nostdlib $(COPT)
+CFLAGS_SECUREBOOT += -Wall -Werror -g -ansi -std=c11 -nostdlib $(COPT)
 CFLAGS_SECUREBOOT += -fno-strict-aliasing
 
 LD_FILES_SECUREBOOT += nrf9160_1M_256k_secure.ld common.ld
@@ -45,7 +54,7 @@ LIBS_SECUREBOOT += -L $(dir $(LIBGCC_FILE_NAME)) -lgcc
 LIBS_SECUREBOOT += -L $(dir $(LIBC_FILE_NAME)) -lc
 
 $(BUILD)/secureboot.elf:
-	$(Q)$(CC) $(LDFLAGS_SECUREBOOT) $(SRC_SECUREBOOT) $(INC_SECUREBOOT) -O3 -o $@ $(LIBS_SECUREBOOT)
+	$(Q)$(CC) $(LDFLAGS_SECUREBOOT) $(SRC_SECUREBOOT) $(INC_SECUREBOOT) -O0 -o $@ $(LIBS_SECUREBOOT)
 	$(SIZE) $@
 
 $(BUILD)/secureboot.hex: $(BUILD)/secureboot.elf
