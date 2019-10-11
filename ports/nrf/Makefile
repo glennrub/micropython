@@ -195,6 +195,7 @@ DRIVERS_SRC_C += $(addprefix modules/,\
         socket/modusocket.c \
         socket/modnwlte.c \
         socket/moduselect.c \
+        uos/securefs.c \
         )
 
 INC += -I./modules/socket

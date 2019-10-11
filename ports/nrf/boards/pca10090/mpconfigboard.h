@@ -41,6 +41,8 @@
 #define MICROPY_PY_RANDOM_HW_RNG    (0)
 
 #define MICROPY_MBFS                (0)
+#define MICROPY_SECURITY_FS         (0)
+#define MICROPY_VFS                 (0)
 
 #define MICROPY_HW_HAS_LED          (1)
 #define MICROPY_HW_HAS_SWITCH       (0)
