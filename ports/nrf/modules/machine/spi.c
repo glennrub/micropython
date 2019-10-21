@@ -152,14 +152,32 @@ STATIC int spi_find(mp_obj_t id) {
 }
 
 void spi_transfer(const machine_hard_spi_obj_t * self, size_t len, const void * src, void * dest) {
+
+    uint8_t * tx_buffer = NULL;
+
+#if NRFX_SPIM_ENABLED
+    if (src != NULL) {
+        tx_buffer = m_new(uint8_t, len);
+    }
+    memcpy(tx_buffer, src, len);
+#else
+    tx_buffer = (uint8_t *)src;
+#endif
+
     nrfx_spi_xfer_desc_t xfer_desc = {
-        .p_tx_buffer = src,
+        .p_tx_buffer = tx_buffer,
         .tx_length   = len,
         .p_rx_buffer = dest,
         .rx_length   = len
     };
 
-    nrfx_spi_xfer(self->p_spi, &xfer_desc, 0);
+    (void)nrfx_spi_xfer(self->p_spi, &xfer_desc, 0);
+
+#if NRFX_SPIM_ENABLED
+    if (tx_buffer != NULL) {
+        m_free(tx_buffer);
+    }
+#endif
 }
 
 /******************************************************************************/
