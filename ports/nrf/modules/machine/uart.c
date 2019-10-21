@@ -57,7 +57,7 @@
 typedef struct _machine_hard_uart_buf_t {
     uint8_t tx_buf[1];
     uint8_t rx_buf[1];
-    uint8_t rx_ringbuf_array[64];
+    uint8_t rx_ringbuf_array[4096];
     volatile ringbuf_t rx_ringbuf;
 } machine_hard_uart_buf_t;
 
@@ -210,7 +210,7 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
 #if (BLUETOOTH_SD == 100)
     config.interrupt_priority = 3;
 #else
-    config.interrupt_priority = 6;
+    config.interrupt_priority = 2;
 #endif
 
     // These baudrates are not supported, it seems.

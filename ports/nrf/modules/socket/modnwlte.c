@@ -621,22 +621,48 @@ STATIC mp_obj_t lte_nrf91_connect(mp_obj_t self_in) {
     }
 
     memset(m_result_buffer, 0, MP_ARRAY_SIZE(m_result_buffer));
-
-    while (true) {
+    bool connected = false;
+    bool failed    = false;
+    while (!connected || !failed) {
         int read = nrf_recv(handle, m_result_buffer, MP_ARRAY_SIZE(m_result_buffer), 0);
         if (read >= 9) {
-            if (strncmp(m_result_buffer, "+CEREG: 2", 9) == 0)
-            {
+            if (strncmp(m_result_buffer, "+CEREG: 1", 9) == 0) {
+                // home network.
+                connected = true;
                 break;
+            }
+            else if (strncmp(m_result_buffer, "+CEREG: 5", 9) == 0) {
+                // roam network.
+                connected = true;
+                break;
+            }
+            else if (strncmp(m_result_buffer, "+CEREG: 0", 9) == 0) {
+                // not registered.
+                failed = true;
+                break;
+            }
+            else if (strncmp(m_result_buffer, "+CEREG: 3", 9) == 0) {
+                // registration denied.
+                failed = true;
+                break;
+            }
+            else {
+                // 2 – Not registered, but UE is currently trying to
+                //     attach or searching an operator toregister to.
+                // 4 – Unknown (e.g. out of E-UTRAN coverage).
+                // 8 – Attached for emergency bearer services only.
+                // 90 – Not registered due to UICC failure.
             }
         }
     }
 
     (void)nrf_close(handle);
 
-    // TODO: Check if link was created.
+    if (connected) {
+        return mp_const_true;
+    }
 
-    return mp_const_true;
+    return mp_const_false;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(lte_nrf91_connect_obj, lte_nrf91_connect);
 

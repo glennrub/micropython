@@ -57,10 +57,12 @@ typedef struct _machine_rtc_obj_t {
 
 STATIC const nrfx_rtc_t machine_rtc_instances[] = {
     NRFX_RTC_INSTANCE(0),
+#if !defined(NRF9160_XXAA)
     NRFX_RTC_INSTANCE(1),
 #if defined(NRF52_SERIES)
     NRFX_RTC_INSTANCE(2),
 #endif
+#endif // !NRF9160_XXAA
 };
 
 STATIC machine_rtc_config_t configs[MP_ARRAY_SIZE(machine_rtc_instances)];
