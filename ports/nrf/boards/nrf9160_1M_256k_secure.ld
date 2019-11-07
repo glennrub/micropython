@@ -1,6 +1,11 @@
-/* Specify the memory areas */
-MEMORY
-{
-    FLASH_TEXT (rx) : ORIGIN = 0x00000000,     LENGTH = 32K
-    RAM (xrw)       : ORIGIN = 0x20000000,     LENGTH = 64K
-}
+/*
+    GNU linker script for NRF9160 Secure
+*/
+
+_flash_size = 64K;
+_ram_size   = 64K;
+_fs_size    = 0;
+
+/* Not used. */
+_stack_size = 0;
+_minimum_heap_size = 0;

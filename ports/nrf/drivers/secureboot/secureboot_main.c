@@ -29,10 +29,10 @@
 
 // Secure flash 32K.
 #define SECURE_32K_FLASH_PAGE_START    (0)
-#define SECURE_32K_FLASH_PAGE_END      (0)
+#define SECURE_32K_FLASH_PAGE_END      (1)
 
 // Non-secure flash 992K.
-#define NONSECURE_32K_FLASH_PAGE_START (1)
+#define NONSECURE_32K_FLASH_PAGE_START (2)
 #define NONSECURE_32K_FLASH_PAGE_END   (31)
 
 // Secure RAM 64K.
@@ -149,7 +149,7 @@ static void jump_to_non_secure(void)
     SAU->CTRL |= SAU_CTRL_ALLNS_Msk;
 
     // Set NS vector table.
-    uint32_t * vtor_ns = (uint32_t *)0x8000;
+    uint32_t * vtor_ns = (uint32_t *)0x10000;
     SCB_NS->VTOR = (uint32_t)vtor_ns;
 
     // Allow for FPU to be used by NS.
@@ -177,6 +177,19 @@ static void jump_to_non_secure(void)
 }
 
 int main(void) {
+
+    /* Cleanup MCUboot dirty jump. */
+    NRF_CLOCK_S->INTENCLR = 0xFFFFFFFF;
+    NRF_POWER_S->INTENCLR = 0xFFFFFFFF;
+    NRF_RTC1_S->INTENCLR = 0xFFFFFFFF;
+
+    NVIC_DisableIRQ(CLOCK_POWER_IRQn);
+    NVIC_DisableIRQ(RTC1_IRQn);
+
+    __enable_irq();
+    __set_BASEPRI(0);
+    /* End of cleanup */
+
     configure_flash();
     configure_ram();
     configure_peripherals();
