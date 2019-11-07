@@ -123,6 +123,10 @@ void Default_KMU_IRQHandler              (void) { while (1); }
 void Default_CRYPTOCELL_IRQHandler       (void) { while (1); }
 
 void Reset_Handler(void) {
+#if NRF9160_XXAA && !NRF_TRUSTZONE_NONSECURE
+    // Set SCB->VTOR
+    *((volatile uint32_t *)0xE000ED08) = 0xC200;
+#endif
     uint32_t * p_src  = &_sidata;
     uint32_t * p_dest = &_sdata;
 

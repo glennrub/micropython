@@ -345,10 +345,14 @@ OBJ += $(BUILD)/pins_gen.o
 $(BUILD)/$(OOFATFS_DIR)/ff.o: COPT += -Os
 $(filter $(PY_BUILD)/../extmod/vfs_fat_%.o, $(PY_O)): COPT += -Os
 
-.PHONY: all flash deploy sd binary hex
+.PHONY: all flash deploy sd binary hex sign
 
 ifeq ($(MCU_VARIANT), nrf91)
-all: binary hex secureboot
+ifeq ($(BOARD), pca20035)
+all: binary hex secureboot dfu sign
+else
+all: binary hex secureboot dfu
+endif
 else
 all: binary hex
 endif
@@ -373,10 +377,28 @@ ifeq ($(FLASHER),)
 
 ifeq ($(MCU_VARIANT), nrf91)
 
-deploy: $(BUILD)/$(OUTPUT_FILENAME).hex $(BUILD)/secureboot.hex
+ifeq ($(BOARD), pca20035)
+dfu: $(BUILD)/$(OUTPUT_FILENAME).hex secureboot
+	mergehex -m $(BUILD)/secureboot.hex $(BUILD)/$(OUTPUT_FILENAME).hex --output $(BUILD)/merged.hex
+	$(OBJCOPY) -I ihex -O binary $(BUILD)/merged.hex $(BUILD)/merged.bin
+sign: dfu
+	/home/glenn/git/ncs/virtualenv/bin/python /home/glenn/git/ncs/mcuboot/scripts/imgtool.py sign --key /home/glenn/git/ncs/mcuboot/root-rsa-2048.pem --header-size 0x200 --align 4 --version 0.0.0+0 --slot-size 0x69000 --pad-header $(BUILD)/merged.bin $(BUILD)/signed_merged.bin
+	/home/glenn/git/ncs/virtualenv/bin/python /home/glenn/git/ncs/mcuboot/scripts/imgtool.py sign --key /home/glenn/git/ncs/mcuboot/root-rsa-2048.pem --header-size 0x200 --align 4 --version 0.0.0+0 --slot-size 0xc000 --pad-header $(BUILD)/secureboot.bin $(BUILD)/signed_secureboot.bin
+	/home/glenn/git/ncs/virtualenv/bin/python /home/glenn/git/ncs/mcuboot/scripts/imgtool.py sign --key /home/glenn/git/ncs/mcuboot/root-rsa-2048.pem --header-size 0x200 --align 4 --version 0.0.0+0 --slot-size 0x69000 --pad-header $(BUILD)/firmware.bin $(BUILD)/signed_firmware.bin
+
+deploy: sign
+	mcumgr --conntype=serial --connstring=/dev/ttyUSB0 image upload $(BUILD)/signed_merged.bin
+	mcumgr --conntype=serial --connstring=/dev/ttyUSB0 reset
+else
+dfu: $(BUILD)/$(OUTPUT_FILENAME).hex secureboot
+	mergehex -m $(BUILD)/secureboot.hex $(BUILD)/$(OUTPUT_FILENAME).hex --output $(BUILD)/merged.hex
+	$(OBJCOPY) -I ihex -O binary $(BUILD)/merged.hex $(BUILD)/merged.bin
+
+deploy: $(BUILD)/$(OUTPUT_FILENAME).hex secureboot
 	nrfjprog --program $(BUILD)/secureboot.hex --sectorerase -f $(MCU_VARIANT)
 	nrfjprog --program $(BUILD)/$(OUTPUT_FILENAME).hex --sectorerase -f $(MCU_VARIANT)
 	nrfjprog --reset -f $(MCU_VARIANT)
+endif
 
 else
 

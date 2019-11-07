@@ -44,12 +44,23 @@ LIBC_FILE_NAME = $(shell $(CC) $(CFLAGS_SECUREBOOT) -print-file-name=libc.a)
 LIBS_SECUREBOOT += -L $(dir $(LIBGCC_FILE_NAME)) -lgcc
 LIBS_SECUREBOOT += -L $(dir $(LIBC_FILE_NAME)) -lc
 
+.PHONY: secureboot_hex secureboot_binary secureboot
+
 $(BUILD)/secureboot.elf:
 	$(Q)$(CC) $(LDFLAGS_SECUREBOOT) $(SRC_SECUREBOOT) $(INC_SECUREBOOT) -O3 -o $@ $(LIBS_SECUREBOOT)
 	$(SIZE) $@
 
+## Create binary .bin file from the .out file
+secureboot_binary: $(BUILD)/secureboot.bin
+
+$(BUILD)/secureboot.bin: $(BUILD)/secureboot.elf
+	$(OBJCOPY) -O binary $< $@
+
+## Create binary .hex file from the .out file
+secureboot_hex: $(BUILD)/secureboot.hex
+
 $(BUILD)/secureboot.hex: $(BUILD)/secureboot.elf
 	$(OBJCOPY) -O ihex $< $@
 
-secureboot: $(BUILD)/secureboot.hex
+secureboot: secureboot_hex secureboot_binary
 	@echo "Secure boot"
