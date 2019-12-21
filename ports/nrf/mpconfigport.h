@@ -67,7 +67,13 @@
 #define MICROPY_FATFS_LFN_CODE_PAGE    437 /* 1=SFN/ANSI 437=LFN/U.S.(OEM) */
 #define MICROPY_FATFS_USE_LABEL        (1)
 #define MICROPY_FATFS_RPATH            (2)
-#define MICROPY_FATFS_MULTI_PARTITION  (1)
+#define MICROPY_FATFS_MULTI_PARTITION  (0)
+
+#if NRF51
+    #define MICROPY_FATFS_MAX_SS       (1024)
+#else
+    #define MICROPY_FATFS_MAX_SS       (4096)
+#endif
 
 // TODO these should be generic, not bound to fatfs
 #define mp_type_fileio fatfs_type_fileio
@@ -104,19 +110,19 @@
 #define MICROPY_MODULE_BUILTIN_INIT (1)
 #define MICROPY_PY_ALL_SPECIAL_METHODS (0)
 #define MICROPY_PY_MICROPYTHON_MEM_INFO (1)
-#define MICROPY_PY_ARRAY_SLICE_ASSIGN (0)
+#define MICROPY_PY_ARRAY_SLICE_ASSIGN (1)
 #define MICROPY_PY_BUILTINS_SLICE_ATTRS (0)
 #define MICROPY_PY_SYS_EXIT         (1)
 #define MICROPY_PY_SYS_MAXSIZE      (1)
-#define MICROPY_PY_SYS_STDFILES     (0)
+#define MICROPY_PY_SYS_STDFILES     (1)
 #define MICROPY_PY_SYS_STDIO_BUFFER (0)
 #define MICROPY_PY_COLLECTIONS_ORDEREDDICT (0)
 #define MICROPY_PY_MATH_SPECIAL_FUNCTIONS (0)
 #define MICROPY_PY_CMATH            (0)
 #define MICROPY_PY_IO               (0)
-#define MICROPY_PY_IO_FILEIO        (0)
+#define MICROPY_PY_IO_FILEIO        (MICROPY_VFS_FAT)
 #define MICROPY_PY_UERRNO           (0)
-#define MICROPY_PY_UBINASCII        (0)
+#define MICROPY_PY_UBINASCII        (1)
 #define MICROPY_PY_URANDOM          (0)
 #define MICROPY_PY_URANDOM_EXTRA_FUNCS (0)
 #define MICROPY_PY_UCTYPES          (0)
@@ -213,11 +219,18 @@ typedef long mp_off_t;
 // extra built in modules to add to the list of known ones
 extern const struct _mp_obj_module_t board_module;
 extern const struct _mp_obj_module_t machine_module;
+extern const struct _mp_obj_module_t nrf_module;
 extern const struct _mp_obj_module_t mp_module_utime;
 extern const struct _mp_obj_module_t mp_module_uos;
 extern const struct _mp_obj_module_t mp_module_ubluepy;
 extern const struct _mp_obj_module_t music_module;
 extern const struct _mp_obj_module_t random_module;
+
+#if MICROPY_HW_ENABLE_STORAGE
+#define NRF_MODULE                          { MP_ROM_QSTR(MP_QSTR_nrf), MP_ROM_PTR(&nrf_module) },
+#else
+#define NRF_MODULE
+#endif
 
 #if MICROPY_PY_UBLUEPY
 #define UBLUEPY_MODULE                      { MP_ROM_QSTR(MP_QSTR_ubluepy), MP_ROM_PTR(&mp_module_ubluepy) },
@@ -264,6 +277,7 @@ extern const struct _mp_obj_module_t ble_module;
     UBLUEPY_MODULE \
     RANDOM_MODULE \
     MICROPY_BOARD_BUILTINS \
+    NRF_MODULE \
 
 
 #else
@@ -276,6 +290,7 @@ extern const struct _mp_obj_module_t ble_module;
     MUSIC_MODULE \
     RANDOM_MODULE \
     MICROPY_BOARD_BUILTINS \
+    NRF_MODULE \
 
 
 #endif // BLUETOOTH_SD

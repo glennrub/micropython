@@ -26,7 +26,7 @@
 
 #include "py/mpconfig.h"
 
-#if MICROPY_MBFS && BLUETOOTH_SD
+#if (MICROPY_HW_ENABLE_STORAGE || MICROPY_MBFS) && BLUETOOTH_SD
 
 #include "drivers/flash.h"
 #include "drivers/bluetooth/ble_drv.h"
