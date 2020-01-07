@@ -210,7 +210,7 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
 #if (BLUETOOTH_SD == 100)
     config.interrupt_priority = 3;
 #else
-    config.interrupt_priority = 6;
+    config.interrupt_priority = 2;
 #endif
 
     // These baudrates are not supported, it seems.
