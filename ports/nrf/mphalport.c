@@ -117,7 +117,7 @@ void mp_hal_delay_us(mp_uint_t us)
         " NOP\n"
         " NOP\n"
         " NOP\n"
-#if defined(NRF52) || defined(NRF9160_XXAA)
+#if defined(NRF52_SERIES) || defined(NRF9160_XXAA)
         " NOP\n"
         " NOP\n"
         " NOP\n"
