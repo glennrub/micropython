@@ -41,6 +41,7 @@
 #define MICROPY_VFS                 (1)
 #define MICROPY_HW_ENABLE_STORAGE   (1)
 #define MICROPY_MBFS                (0)
+#define MICROPY_HW_BDEV_READBLOCKS_EXT (1)
 
 #define MICROPY_HW_HAS_LED          (1)
 #define MICROPY_HW_LED_COUNT        (4)

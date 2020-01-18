@@ -37,6 +37,6 @@ typedef struct {
 
 extern const mp_obj_type_t nrf_flashbdev_obj;
 
-void flash_init_vfs(fs_user_mount_t *vfs);
+void flash_init_vfs_fat(fs_user_mount_t *vfs);
 
 #endif // MODNRF_H__

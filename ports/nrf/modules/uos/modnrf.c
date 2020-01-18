@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "py/runtime.h"
+#include "py/mperrno.h"
 #include "mpconfigboard.h"
 
 #if MICROPY_HW_ENABLE_STORAGE
@@ -41,6 +42,7 @@ extern byte _fs_end[];
 
 #define FLASH_BLOCK_START (((uint32_t)_fs_start + (FLASH_PAGESIZE-1)) / FLASH_PAGESIZE)
 
+#if MICROPY_VFS_FAT
 static int nrf_flashbdev_readblocks_native(uint8_t *buf, size_t block_num, size_t num_blocks) {
     mp_int_t address = (FLASH_BLOCK_START + block_num) * FLASH_PAGESIZE;
     byte *p = (byte*)address;
@@ -61,41 +63,51 @@ static int nrf_flashbdev_writeblocks_native(const uint8_t *buf, size_t block_num
     }
     return 0;
 }
+#endif
 
-mp_obj_t nrf_flashbdev_readblocks(mp_obj_t self_in, mp_obj_t n_in, mp_obj_t buf_in) {
-
-    mp_int_t n = mp_obj_get_int(n_in);
+mp_obj_t nrf_flashbdev_readblocks(size_t n_args, const mp_obj_t * args) {
+    uint32_t block_num = mp_obj_get_int(args[1]);
     mp_buffer_info_t bufinfo;
-    mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_WRITE);
+    mp_get_buffer_raise(args[2], &bufinfo, MP_BUFFER_WRITE);
 
-    mp_int_t address = (FLASH_BLOCK_START + n) * FLASH_PAGESIZE;
+    mp_int_t address = (FLASH_BLOCK_START + block_num) * FLASH_PAGESIZE;
+
+    #if defined(MICROPY_HW_BDEV_READBLOCKS_EXT)
+    if (n_args == 4) {
+        uint32_t offset = mp_obj_get_int(args[3]);
+        address += offset;
+    }
+    #endif
+
     byte *buf = bufinfo.buf;
-    byte *p = (byte*)address;
-    for (int i=0; i<bufinfo.len; i++) {
+    byte *p = (byte *)address;
+    for (int i = 0; i < bufinfo.len; i++) {
         buf[i] = p[i];
     }
+
     return MP_OBJ_NEW_SMALL_INT(0);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(nrf_flashbdev_readblocks_obj, nrf_flashbdev_readblocks);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(nrf_flashbdev_readblocks_obj, 3, 4, nrf_flashbdev_readblocks);
 
-mp_obj_t nrf_flashbdev_writeblocks(mp_obj_t self_in, mp_obj_t n_in, mp_obj_t buf_in) {
-    mp_int_t n = mp_obj_get_int(n_in);
+mp_obj_t nrf_flashbdev_writeblocks(size_t n_args, const mp_obj_t * args) {
+    uint32_t block_num = mp_obj_get_int(args[1]);
     mp_buffer_info_t bufinfo;
-    mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_READ);
+    mp_get_buffer_raise(args[2], &bufinfo, MP_BUFFER_WRITE);
 
-    mp_int_t address = (FLASH_BLOCK_START + n) * FLASH_PAGESIZE;
-    if (address & 0x3 || bufinfo.len & 0x3) {
-        mp_raise_ValueError("invalid address or buffer length");
+    mp_int_t address = (FLASH_BLOCK_START + block_num) * FLASH_PAGESIZE;
+
+    #if defined(MICROPY_HW_BDEV_READBLOCKS_EXT)
+    if (n_args == 4) {
+        uint32_t offset = mp_obj_get_int(args[3]);
+        address += offset;
     }
-
-    flash_page_erase(address);
+    #endif
 
     flash_write_bytes(address, bufinfo.buf, bufinfo.len);
 
     return MP_OBJ_NEW_SMALL_INT(0);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(nrf_flashbdev_writeblocks_obj, nrf_flashbdev_writeblocks);
-
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(nrf_flashbdev_writeblocks_obj, 3, 4, nrf_flashbdev_writeblocks);
 
 mp_obj_t nrf_flashbdev_ioctl(mp_obj_t self_in, mp_obj_t op_in, mp_obj_t arg_in) {
     mp_int_t op = mp_obj_get_int(op_in);
@@ -123,6 +135,14 @@ mp_obj_t nrf_flashbdev_ioctl(mp_obj_t self_in, mp_obj_t op_in, mp_obj_t arg_in) 
         }
 
         case MP_BLOCKDEV_IOCTL_BLOCK_ERASE: {
+            mp_int_t block_num = mp_obj_get_int(arg_in);
+            mp_int_t address = (FLASH_BLOCK_START + block_num) * FLASH_PAGESIZE;
+
+            if ((address & 0x3) || (address % FLASH_PAGESIZE != 0)) {
+                return MP_OBJ_NEW_SMALL_INT(-MP_EIO);
+            }
+
+            flash_page_erase(address);
             return MP_OBJ_NEW_SMALL_INT(0);
         }
 
@@ -164,7 +184,8 @@ const mp_obj_module_t nrf_module = {
     .globals = (mp_obj_dict_t*)&nrf_module_globals,
 };
 
-void flash_init_vfs(fs_user_mount_t *vfs) {
+#if MICROPY_VFS_FAT
+void flash_init_vfs_fat(fs_user_mount_t *vfs) {
     vfs->base.type = &mp_fat_vfs_type;
 
     vfs->blockdev.flags |= MP_BLOCKDEV_FLAG_HAVE_IOCTL;
@@ -185,5 +206,6 @@ void flash_init_vfs(fs_user_mount_t *vfs) {
     vfs->blockdev.u.ioctl[0] = MP_OBJ_FROM_PTR(&nrf_flashbdev_ioctl_obj);
     vfs->blockdev.u.ioctl[1] = MP_OBJ_FROM_PTR(&nrf_flashbdev_obj);
 }
+#endif
 
 #endif // MICROPY_PY_NRF

@@ -128,8 +128,9 @@ STATIC int vfs_mount_and_chdir(mp_obj_t bdev, mp_obj_t mount_point) {
 }
 
 int factory_reset_filesystem(void) {
+#if MICROPY_VFS_FAT
     fs_user_mount_t vfs;
-    flash_init_vfs(&vfs);
+    flash_init_vfs_fat(&vfs);
     uint8_t working_buf[FF_MAX_SS];
     FRESULT res = f_mkfs(&vfs.fatfs, FM_FAT | FM_SFD, 0, working_buf, sizeof(working_buf));
     if (res != FR_OK) {
@@ -139,6 +140,19 @@ int factory_reset_filesystem(void) {
 
     // Set label
     f_setlabel(&vfs.fatfs, MICROPY_HW_FLASH_FS_LABEL);
+#endif
+#if MICROPY_VFS_LFS1
+    // Setup builtin flash
+    do_str("import uos, nrf\n" \
+           "uos.VfsLfs1.mkfs(nrf.flashbdev)",
+           MP_PARSE_FILE_INPUT);
+#endif
+#if MICROPY_VFS_LFS2
+    // Setup builtin flash
+    do_str("import uos, nrf\n" \
+           "uos.VfsLfs2.mkfs(nrf.flashbdev)",
+           MP_PARSE_FILE_INPUT);
+#endif
     return 0;
 }
 #endif
@@ -217,7 +231,7 @@ soft_reset:
     mp_obj_t mount_point = MP_OBJ_NEW_QSTR(MP_QSTR__slash_flash);
     int ret = vfs_mount_and_chdir((mp_obj_t)&nrf_flashbdev_obj, mount_point);
 
-    if (ret == -MP_ENODEV) {
+    if ((ret == -MP_ENODEV) || (ret == -MP_EIO)) {
         ret = factory_reset_filesystem();
         if (ret == 0) {
             ret = vfs_mount_and_chdir((mp_obj_t)&nrf_flashbdev_obj, mount_point);

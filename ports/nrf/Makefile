@@ -38,12 +38,13 @@ endif
 # qstr definitions (must come before including py.mk)
 QSTR_DEFS = qstrdefsport.h $(BUILD)/pins_qstr.h
 
+MICROPY_VFS_FAT ?= 0
+
 # include py core make definitions
 include ../../py/py.mk
 
 GIT_SUBMODULES = lib/nrfx lib/tinyusb
 
-MICROPY_VFS_FAT ?= 0
 MPY_CROSS = ../../mpy-cross/mpy-cross
 MPY_TOOL = ../../tools/mpy-tool.py
 
@@ -117,6 +118,9 @@ CFLAGS += -DNRF5_HAL_H='<$(MCU_VARIANT)_hal.h>'
 LDFLAGS = $(CFLAGS)
 LDFLAGS += -Xlinker -Map=$(@:.elf=.map)
 LDFLAGS += -mthumb -mabi=aapcs $(addprefix -T,$(LD_FILES)) -L boards/
+
+FS_SIZE ?= 256K
+LDFLAGS += -Wl,'--defsym=_fs_size=$(FS_SIZE)'
 
 #Debugging/Optimization
 ifeq ($(DEBUG), 1)
