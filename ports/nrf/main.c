@@ -59,6 +59,7 @@
 
 #if BLUETOOTH_SD
 #include "nrf_sdm.h"
+#include "mphalport.h"
 #endif
 
 #if (MICROPY_PY_BLE_NUS)
@@ -317,6 +318,10 @@ led_state(1, 0);
     usb_cdc_init();
 #endif
 
+#if BLUETOOTH_SD
+ble_reset:
+#endif
+
     for (;;) {
         if (pyexec_mode_kind == PYEXEC_MODE_RAW_REPL) {
             if (pyexec_raw_repl() != 0) {
@@ -329,6 +334,11 @@ led_state(1, 0);
             }
         }
     }
+
+#if BLUETOOTH_SD
+    printf("MPY: soft reboot\n");
+    goto ble_reset;
+#endif
 
     mp_deinit();
 
