@@ -26,6 +26,11 @@ else
 	include drivers/bluetooth/bluetooth_common.mk
 endif
 
+ifneq ($(BOOTLOADER),)
+	# Use additional bootloader linker script
+	LD_FILES += boards/$(MCU_SUB_VARIANT)_$(BOOTLOADER)_$(BOOTLOADER_VERSION).ld
+endif
+
 LD_FILES += boards/memory.ld boards/common.ld
 
 ifneq ($(LD_FILE),)
@@ -459,7 +464,31 @@ deploy: $(BUILD)/$(OUTPUT_FILENAME).hex
 sd: $(BUILD)/$(OUTPUT_FILENAME).hex
 	$(Q)$(OPENOCD) -f interface/cmsis-dap.cfg -f $(OPENOCD_TARGET) -c "init" -c "program $(SOFTDEV_HEX) verify reset" -c "exit"
 
+else ifeq ($(FLASHER), nrfutil)
+
+NRFUTIL_PORT ?= /dev/ttyACM0
+
+ifeq ($(BOARD), nrf52840-mdk-usb-dongle)
+
+NRFUTIL_SD_REQ ?= 0x00
+
+ifneq ($(SD), )
+NRFUTIL_SD_REQ = 0xB6
 endif
+
+sd:
+	$(Q)hexmerge.py -o $(BUILD)/stripped_sd.hex --range=0x1000: $(SOFTDEV_HEX)
+	$(Q)nrfutil pkg generate --hw-version 52 --sd-req 0x00 --sd-id 0x00 --softdevice $(BUILD)/stripped_sd.hex stripped_sd.zip
+	$(Q)nrfutil dfu usb-serial -pkg stripped_sd.zip -p $(NRFUTIL_PORT)
+
+deploy:
+	$(Q)nrfutil pkg generate --hw-version 52 --sd-req $(NRFUTIL_SD_REQ) --application-version 1 --application $(BUILD)/$(OUTPUT_FILENAME).hex $(BUILD)/$(OUTPUT_FILENAME)_dfu.zip
+	$(Q)nrfutil dfu usb-serial -pkg $(BUILD)/$(OUTPUT_FILENAME)_dfu.zip -p $(NRFUTIL_PORT)
+
+endif
+
+endif
+
 
 flash: deploy
 
