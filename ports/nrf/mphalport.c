@@ -35,6 +35,82 @@
 #include "nrfx_errors.h"
 #include "nrfx_config.h"
 
+#if MICROPY_PY_TIME_TICKS
+#include "nrfx_rtc.h"
+#endif
+
+
+#if MICROPY_PY_TIME_TICKS
+// use RTC1 for time ticks generation
+// with 32kHz tick resolution and overflow
+// handling in irq
+
+nrfx_rtc_t rtc1 = NRFX_RTC_INSTANCE(1);
+
+volatile mp_uint_t rtc_overflows = 0;
+
+const nrfx_rtc_config_t rtc_config_time_ticks = {
+    .prescaler    = 0,
+    .reliable     = 0,
+    .tick_latency = 0,
+    #ifdef NRF51
+    .interrupt_priority = 1,
+    #else
+    .interrupt_priority = 3,
+    #endif
+};
+
+STATIC void rtc_irq_time(nrfx_rtc_int_type_t event) {
+    // irq handler for overflow
+    if (event == NRFX_RTC_INT_OVERFLOW) {
+        rtc_overflows += 1;
+    }
+}
+
+void rtc1_init_time_ticks(void) {
+    nrfx_rtc_init(&rtc1, &rtc_config_time_ticks, rtc_irq_time);
+    nrfx_rtc_overflow_enable(&rtc1, true);
+    nrfx_rtc_enable(&rtc1);
+}
+
+mp_uint_t mp_hal_ticks_ms(void) {
+    // note that COUNTER * 1000 / 32768 would overflow during calculation, so use
+    // the less obvious * 125 / 4096 calculation (overflow secure)
+    //
+    // also make sure not to call this function within an irq with higher
+    // prio than the RTC's irq. This would introduce the danger of 
+    // preempting the RTC irq and calling mp_hal_ticks_ms() at that time
+    // would return a false result
+    //
+    // also lets guard the function against interrupting from the RTC 
+    // overflow irq while the calculation takes place
+    mp_uint_t ticks;
+    rtc1.p_reg->INTENCLR = RTC_INTENSET_OVRFLW_Msk;
+    ticks = (rtc_overflows << 9) * 1000 + ((mp_uint_t)rtc1.p_reg->COUNTER * 125 / 4096);
+    rtc1.p_reg->INTENSET = RTC_INTENSET_OVRFLW_Msk;
+    return ticks;
+}
+
+mp_uint_t mp_hal_ticks_us(void) {
+    // make the best out of the 32kHz tick resolution (= 30.57usec / tick)
+    // to scale we could use same approach as above and use COUNTER * 125000 / 4096
+    // but that will overflow for 32bit multiplications.
+    //
+    // Since this function is likely to be called in a poll loop it must
+    // be fast and casting to 64 bits adds calculation time within that loop,
+    // causing timing inaccuracy.
+    //
+    // An easier solution is to use COUNTER * 214 / 7, introducing a small
+    // error of app. 0.18%.
+    return (mp_uint_t)rtc1.p_reg->COUNTER * 214 / 7;
+}
+
+#else
+mp_uint_t mp_hal_ticks_ms(void) {
+    return 0;
+}
+#endif
+
 // this table converts from HAL_StatusTypeDef to POSIX errno
 const byte mp_hal_status_to_errno_table[4] = {
     [HAL_OK] = 0,

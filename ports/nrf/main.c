@@ -52,6 +52,8 @@
 #include "i2c.h"
 #include "adc.h"
 #include "rtcounter.h"
+#include "mphalport.h"
+
 #if MICROPY_PY_MACHINE_HW_PWM
 #include "pwm.h"
 #endif
@@ -126,7 +128,6 @@ soft_reset:
     mp_obj_list_init(mp_sys_argv, 0);
 
     readline_init0();
-
 
     #if MICROPY_PY_MACHINE_HW_SPI
     spi_init0();
@@ -228,6 +229,10 @@ soft_reset:
     #if MICROPY_PY_MACHINE_SOFT_PWM
     ticker_start();
     pwm_start();
+    #endif
+
+    #if MICROPY_PY_TIME_TICKS
+    rtc1_init_time_ticks();
     #endif
 
     led_state(1, 0);

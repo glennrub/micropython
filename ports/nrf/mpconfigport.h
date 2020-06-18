@@ -182,6 +182,10 @@
 #define MICROPY_PY_USELECT_POSIX    (0)
 #endif
 
+#ifndef MICROPY_PY_TIME_TICKS
+#define MICROPY_PY_TIME_TICKS       (1)
+#endif
+
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (0)
 
@@ -336,6 +340,11 @@ extern const struct _mp_obj_module_t ble_module;
     mp_obj_list_t mod_network_nic_list;
 #else
 #define ROOT_POINTERS_NIC_LIST
+#endif
+
+#ifdef MICROPY_PY_TIME_USE_RTC_BASE
+// configure 24 bit time base for ticks
+#define MICROPY_PY_UTIME_TICKS_PERIOD (1 << 24)
 #endif
 
 #if defined(NRF52840_XXAA)

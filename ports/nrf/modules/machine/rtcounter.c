@@ -30,6 +30,7 @@
 #include "rtcounter.h"
 #include "nrfx_rtc.h"
 #include "nrf_clock.h"
+#include "py/mperrno.h"
 
 #if MICROPY_PY_MACHINE_RTCOUNTER
 
@@ -108,6 +109,10 @@ STATIC void interrupt_handler2(nrfx_rtc_int_type_t int_type) {
 #endif
 
 void rtc_init0(void) {
+    // Start the low-frequency clock (if it hasn't been started already)
+    if (!nrf_clock_lf_is_running(NRF_CLOCK)) {
+        nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_LFCLKSTART);
+    }
 }
 
 STATIC int rtc_find(mp_obj_t id) {
@@ -153,6 +158,13 @@ STATIC mp_obj_t machine_rtc_make_new(const mp_obj_type_t *type, size_t n_args, s
 
     int rtc_id = rtc_find(args[ARG_id].u_obj);
 
+    #if MICROPY_PY_TIME_TICKS
+    if (rtc_id == 1) {
+        // time module uses RTC1, prevent using it
+        mp_raise_ValueError(MP_ERROR_TEXT("RTC1 reserved by time module"));
+    }
+    #endif
+
     // const and non-const part of the RTC object.
     const machine_rtc_obj_t * self = &machine_rtc_obj[rtc_id];
     machine_rtc_config_t *config = self->config;
@@ -172,11 +184,6 @@ STATIC mp_obj_t machine_rtc_make_new(const mp_obj_type_t *type, size_t n_args, s
     } else {
         // Period between the intervals
         config->period = args[ARG_period].u_int;
-    }
-
-    // Start the low-frequency clock (if it hasn't been started already)
-    if (!nrf_clock_lf_is_running(NRF_CLOCK)) {
-        nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_LFCLKSTART);
     }
 
     // Make sure it's uninitialized.
