@@ -194,8 +194,7 @@ SRC_LIB += $(addprefix lib/,\
         )
 
 SRC_C += \
-        drivers/lte/bsd_os.c \
-        drivers/lte/sdk_app_timer_mod.c \
+        drivers/lte/bsd_os.c
 
 DRIVERS_SRC_C += $(addprefix modules/,\
         socket/modnetwork.c \
@@ -206,7 +205,6 @@ DRIVERS_SRC_C += $(addprefix modules/,\
 
 INC += -I./modules/socket
 INC += -I./modules/uos
-INC += -I./drivers/lte
 
 SRC_NRFX += $(addprefix lib/nrfx/drivers/src/,\
         nrfx_uarte.c \

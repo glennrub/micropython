@@ -7,7 +7,6 @@
 #include "nrf_gpio.h"
 #include "errno.h"
 
-#define BSD_OS_TIMER_ENABLED 1
 #define BSD_OS_TRACE_ENABLED 0
 
 #if BSD_OS_TRACE_ENABLED
@@ -32,92 +31,8 @@ static nrfx_uarte_t m_uarte_instance = NRFX_UARTE_INSTANCE(BSD_OS_TRACE_UART_INS
 
 #endif // BSD_OS_TRACE_ENABLED
 
-#if BSD_OS_TIMER_ENABLED
-
-#include "sdk_app_timer_mod.h"
-
-#define SEC_TO_MILLISEC(PARAM)         (PARAM * 1000)
-#define BSD_OS_TIMER_RESOLUTION_IN_MS  5
-
-// BSD_MAX_SOCKET_COUNT + 1
-APP_TIMER_DEF(m_timer0);
-APP_TIMER_DEF(m_timer1);
-APP_TIMER_DEF(m_timer2);
-APP_TIMER_DEF(m_timer3);
-APP_TIMER_DEF(m_timer4);
-APP_TIMER_DEF(m_timer5);
-APP_TIMER_DEF(m_timer6);
-APP_TIMER_DEF(m_timer7);
-
-static const app_timer_id_t m_timers[BSD_MAX_SOCKET_COUNT + 1] = {
-    &m_timer0_data,
-    &m_timer1_data,
-    &m_timer2_data,
-    &m_timer3_data,
-    &m_timer4_data,
-    &m_timer5_data,
-    &m_timer6_data,
-    &m_timer7_data
-};
-
-#define INVALID_CONTEXT 0xFFFFFFFF
-
-typedef struct _bsd_timer_instance_t {
-    app_timer_id_t timer;
-    uint32_t context;
-    bool started;
-    bool timeout;
-} bsd_timer_instance_t;
-
-// static volatile uint8_t m_timer_running[BSD_MAX_SOCKET_COUNT + 1] = {0,};
-static volatile bsd_timer_instance_t m_bsd_timers[8];
-
-static void bsd_timer_reset(uint8_t index) {
-    m_bsd_timers[index].timer = m_timers[index];
-    m_bsd_timers[index].context = INVALID_CONTEXT;
-    m_bsd_timers[index].started = false;
-    m_bsd_timers[index].timeout = false;
-}
-
-static volatile bsd_timer_instance_t *bsd_timer_find(uint32_t context) {
-    for (uint8_t i = 0; i < MP_ARRAY_SIZE(m_bsd_timers); i++) {
-        if (m_bsd_timers[i].context == context) {
-            return &m_bsd_timers[i];
-        }
-    }
-    return NULL;
-}
-
-static volatile bsd_timer_instance_t *bsd_timer_allocate(uint32_t context) {
-    for (uint8_t i = 0; i < MP_ARRAY_SIZE(m_bsd_timers); i++) {
-        if (m_bsd_timers[i].context == INVALID_CONTEXT) {
-            m_bsd_timers[i].context = context;
-            return &m_bsd_timers[i];
-        }
-    }
-    return NULL;
-}
-
-static bool bsd_timer_free(uint32_t context) {
-    for (uint8_t i = 0; i < MP_ARRAY_SIZE(m_bsd_timers); i++) {
-        if (m_bsd_timers[i].context == context) {
-            bsd_timer_reset(i);
-            return true;
-        }
-    }
-    return false;
-}
-
-static void timer_callback(void *p_context) {
-    uint32_t context = ((uint32_t)p_context);
-    volatile bsd_timer_instance_t *p_timer = bsd_timer_find(context);
-    if (p_timer != NULL) {
-        p_timer->timeout = true;
-    }
-}
-#endif // BSD_OS_TIMER_ENABLED
-
-void read_task_create(void) {
+void read_task_create(void)
+{
     // The read task is achieved using SW interrupt.
     NVIC_SetPriority(BSD_APPLICATION_IRQ, BSD_APPLICATION_IRQ_PRIORITY);
     NVIC_ClearPendingIRQ(BSD_APPLICATION_IRQ);
@@ -149,74 +64,15 @@ void trace_task_create(void) {
 #endif
 void bsd_os_init(void) {
     read_task_create();
-    #if BSD_OS_TRACE_ENABLED
+#if BSD_OS_TRACE_ENABLED
     trace_uart_init();
     trace_task_create();
-    #endif
-
-    #if BSD_OS_TIMER_ENABLED
-    app_timer_init();
-    for (uint8_t i = 0; i < MP_ARRAY_SIZE(m_bsd_timers); i++) {
-        (void)app_timer_create(&m_timers[i],
-            APP_TIMER_MODE_SINGLE_SHOT,
-            timer_callback);
-    }
-
-    for (uint8_t i = 0; i < MP_ARRAY_SIZE(m_bsd_timers); i++) {
-        bsd_timer_reset(i);
-    }
-
-    (void)m_timer0;
-    (void)m_timer1;
-    (void)m_timer2;
-    (void)m_timer3;
-    (void)m_timer4;
-    (void)m_timer5;
-    (void)m_timer6;
-    (void)m_timer7;
-
-    #endif // BSD_OS_TIMER_ENABLED
+#endif
 }
 
-int32_t bsd_os_timedwait(uint32_t context, int32_t *timeout) {
-    #if BSD_OS_TIMER_ENABLED
-    if (*timeout > 0) {
-        // Check if we need to create a timer.
-        volatile bsd_timer_instance_t *p_timer = bsd_timer_find(context);
-
-        if (p_timer == NULL) {
-            p_timer = bsd_timer_allocate(context);
-            p_timer->started = false;
-            p_timer->timeout = false;
-        }
-
-        if (p_timer != NULL) {
-            if (p_timer->started == false && p_timer->timeout == false) {
-                p_timer->started = true;
-                (void)app_timer_start(p_timer->timer,
-                    APP_TIMER_TICKS(100),
-                    (void *)context);
-            }
-
-            while (!(p_timer->started == true && p_timer->timeout == true)) {
-                ;
-            }
-            if (p_timer->started == true && p_timer->timeout == true) {
-                (void)app_timer_stop(p_timer->timer);
-                bsd_timer_free(context);
-                *timeout = *timeout - 1000;
-                if (*timeout <= 0) {
-                    return NRF_ETIMEDOUT;
-                }
-                return 0;
-            }
-        } else {
-            // Could not allocate or find any timer instance.
-            return NRF_ENOMEM;
-        }
-    }
-//   __WFI();
-    #endif // BSD_OS_TIMER_ENABLED
+int32_t bsd_os_timedwait(uint32_t context, int32_t * timeout)
+{
+    // TODO: Implement timers.
     return 0;
 }
 
@@ -240,17 +96,17 @@ void BSD_APPLICATION_IRQ_HANDLER(void) {
 }
 
 void bsd_os_trace_irq_set(void) {
-    #if BSD_OS_TRACE_ENABLED
+#if BSD_OS_TRACE_ENABLED
     NVIC_SetPendingIRQ(BSD_OS_TRACE_IRQ);
-    #else
+#else
     bsd_os_trace_irq_handler();
-    #endif
+#endif
 }
 
 void bsd_os_trace_irq_clear(void) {
-    #if BSD_OS_TRACE_ENABLED
+#if BSD_OS_TRACE_ENABLED
     NVIC_ClearPendingIRQ(BSD_OS_TRACE_IRQ);
-    #endif
+#endif
 }
 
 #if BSD_OS_TRACE_ENABLED
@@ -259,8 +115,8 @@ void BSD_OS_TRACE_IRQ_HANDLER(void) {
 }
 #endif
 
-int32_t bsd_os_trace_put(const uint8_t *const p_buffer, uint32_t buf_len) {
-    #if BSD_OS_TRACE_ENABLED
+int32_t bsd_os_trace_put(const uint8_t * const p_buffer, uint32_t buf_len) {
+#if BSD_OS_TRACE_ENABLED
     uint32_t remaining_bytes = buf_len;
 
     while (remaining_bytes) {
@@ -270,6 +126,6 @@ int32_t bsd_os_trace_put(const uint8_t *const p_buffer, uint32_t buf_len) {
         nrfx_uarte_tx(&m_uarte_instance, &p_buffer[index], transfered_len);
         remaining_bytes -= transfered_len;
     }
-    #endif
+#endif
     return 0;
 }
