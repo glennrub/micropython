@@ -505,10 +505,10 @@ ifeq ($(MCU_VARIANT), nrf91)
 
 dfu_package: $(BUILD)/$(OUTPUT_FILENAME).hex secureboot
 	$(Q)hexmerge.py -o $(BUILD)/merged.hex $(BUILD)/secureboot.hex:$(BOOTLOADER_START): $(BUILD)/$(OUTPUT_FILENAME).hex
-	$(OBJCOPY) -I ihex -O binary $(BUILD)/merged.hex $(BUILD)/merged.bin
 
 sign_package: dfu_package
-	$(PYTHON) $(MCUBOOT_HOME)/scripts/imgtool.py sign --key $(MCUBOOT_HOME)/root-rsa-2048.pem --header-size 0x200 --align 4 --version 0.0.0+0 --slot-size 0x69000 --pad-header $(BUILD)/merged.bin $(BUILD)/signed_merged.bin
+	$(PYTHON) $(MCUBOOT_HOME)/scripts/imgtool.py sign --key $(MCUBOOT_HOME)/root-rsa-2048.pem --header-size 0x200 --align 4 --version 0.0.0+0 --slot-size 0x69000 --pad-header $(BUILD)/merged.hex $(BUILD)/signed_merged.hex
+	$(OBJCOPY) -I ihex -O binary $(BUILD)/signed_merged.hex $(BUILD)/signed_merged.bin
 
 deploy: sign_package
 	mcumgr --conntype=serial --connstring=$(MCUMGR_PORT) image upload $(BUILD)/signed_merged.bin
