@@ -42,6 +42,7 @@
 #if MICROPY_PY_NETWORK && MICROPY_PY_LTE_SOCKET
 
 #include "nrf_socket.h"
+#include "nrf_errno.h"
 #include "bsd_platform.h"
 
 #ifdef MAX
@@ -517,8 +518,14 @@ STATIC mp_obj_t lte_nrf91_make_new(const mp_obj_type_t *type, mp_uint_t n_args, 
 	.bsd_memory_address = BSD_RESERVED_MEMORY_ADDRESS,
 	.bsd_memory_size = BSD_RESERVED_MEMORY_SIZE
     };
-    bsd_init(&init_params);
 
+    static bool initialized = false;
+    if (!initialized) {
+        bsd_init(&init_params);
+    } else {
+        bsd_shutdown();
+        bsd_init(&init_params);
+    }
     // regiser NIC with network module
     mod_network_register_nic(&lte_nrf91_obj);
 
@@ -585,7 +592,24 @@ int send_at_command_with_result(int handle, uint8_t * cmd, uint16_t cmd_len, cha
     return read;
 }
 
-STATIC mp_obj_t lte_nrf91_connect(mp_obj_t self_in) {
+STATIC mp_obj_t lte_nrf91_connect(size_t n_args, const mp_obj_t *args) {
+    bool      use_timeout = false;
+    mp_int_t  timeout     = -1;
+    mp_uint_t tick        = 0;
+
+    if (n_args == 2) {
+        #if MICROPY_PY_BUILTINS_FLOAT
+        timeout = 1000 * mp_obj_get_float(args[1]);
+        #else
+        timeout = 1000 * mp_obj_get_int(args[1]);
+        #endif
+
+        if (timeout >= 0) {
+            use_timeout = true;
+            tick = mp_hal_ticks_ms();
+        }
+    }
+
     int handle = nrf_socket(NRF_AF_LTE, NRF_SOCK_DGRAM, NRF_PROTO_AT);
     if (handle < 0)
     {
@@ -594,57 +618,82 @@ STATIC mp_obj_t lte_nrf91_connect(mp_obj_t self_in) {
 
     bool success;
 
-    struct nrf_timeval timeout = {
-        .tv_sec  = 1,
-        .tv_usec = 0
+    struct nrf_timeval sock_timeout = {
+        .tv_sec  = (timeout) / 1000,
+        .tv_usec = (timeout * 1000) % 1000000
     };
 
-    int sock_opt_result = nrf_setsockopt(handle, NRF_SOL_SOCKET, NRF_SO_RCVTIMEO, &timeout, sizeof(struct nrf_timeval));
+    int sock_opt_result = nrf_setsockopt(handle, NRF_SOL_SOCKET, NRF_SO_RCVTIMEO, &sock_timeout, sizeof(struct nrf_timeval));
     if (sock_opt_result < 0) {
-        (void)nrf_close(handle);
-        return mp_const_false;
+        goto cleanup;
     }
 
     static const char at_cfun4[] = "AT+CFUN=4";
     success = send_at_command(handle, (uint8_t *)at_cfun4, MP_ARRAY_SIZE(at_cfun4));
     if (!success) {
-        (void)nrf_close(handle);
-        return mp_const_false;
+        goto cleanup;
     }
 
     static const char at_cereg[] = "AT+CEREG=2";
     success = send_at_command(handle, (uint8_t *)at_cereg, MP_ARRAY_SIZE(at_cereg));
     if (!success) {
-        (void)nrf_close(handle);
-        return mp_const_false;
+        goto cleanup;
     }
 
     static const char at_cfun1[] = "AT+CFUN=1";
     success = send_at_command(handle, (uint8_t *)at_cfun1, MP_ARRAY_SIZE(at_cfun1));
     if (!success) {
-        (void)nrf_close(handle);
-        return mp_const_false;
+        goto cleanup;
     }
 
     memset(m_result_buffer, 0, MP_ARRAY_SIZE(m_result_buffer));
 
-    while (true) {
-        int read = nrf_recv(handle, m_result_buffer, MP_ARRAY_SIZE(m_result_buffer), 0);
+    bool link_established = false;
+
+    while ((!link_established) && ((!use_timeout) || (timeout > 0))) {
+        if (use_timeout) {
+            mp_uint_t new_tick = mp_hal_ticks_ms();
+            mp_uint_t diff_tick = new_tick - tick;
+            tick = new_tick;
+            timeout -= diff_tick;
+        }
+
+        if (use_timeout && (timeout <= 0)) {
+            // In case of timeout, exit before entering timed receive with the same timeout.
+            break;
+        }
+        int read = nrf_recv(handle, m_result_buffer, MP_ARRAY_SIZE(m_result_buffer), NRF_MSG_DONTWAIT);
+
+        // Only continue looping if it is not a serious error.
+        if ((read < 0) && (nrf_errno != NRF_EAGAIN)) {
+            goto cleanup;
+        }
+
         if (read >= 9) {
-            if (strncmp(m_result_buffer, "+CEREG: 2", 9) == 0)
-            {
-                break;
+            if ((strncmp(m_result_buffer, "+CEREG: 1", 9) == 0) || /* Registered, home network. */
+                (strncmp(m_result_buffer, "+CEREG: 5", 9) == 0)) { /* Registered, roaming. */
+
+                link_established = true;
+		break;
             }
         }
     }
 
+cleanup:
+
     (void)nrf_close(handle);
 
-    // TODO: Check if link was created.
-
-    return mp_const_true;
+    if ((use_timeout && timeout <= 0) && (!link_established)) {
+        mp_raise_OSError(MP_ETIMEDOUT);
+    }
+    else if (!success) {
+        return mp_const_false;
+    }
+    else {
+        return mp_const_true;
+    }
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(lte_nrf91_connect_obj, lte_nrf91_connect);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(lte_nrf91_connect_obj, 1, 2, lte_nrf91_connect);
 
 STATIC mp_obj_t lte_nrf91_disconnect(mp_obj_t self_in) {
     int handle = nrf_socket(NRF_AF_LTE, NRF_SOCK_DGRAM, NRF_PROTO_AT);
