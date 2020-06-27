@@ -182,6 +182,10 @@
 #define MICROPY_PY_USELECT_POSIX    (0)
 #endif
 
+#ifndef MICROPY_PY_TIME_TICKS
+#define MICROPY_PY_TIME_TICKS       (0)
+#endif
+
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (0)
 
@@ -360,6 +364,15 @@ extern const struct _mp_obj_module_t ble_module;
     void *async_data[2]; \
     \
     ROOT_POINTERS_NIC_LIST \
+
+#if MICROPY_PY_TIME_TICKS
+#define MICROPY_EVENT_POLL_HOOK \
+    do { \
+        extern void mp_handle_pending(bool); \
+        mp_handle_pending(true); \
+        __WFI(); \
+    } while (0);
+#endif
 
 #define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 
