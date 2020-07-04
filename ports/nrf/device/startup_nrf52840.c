@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2017 Glenn Ruben Bakke
+ * Copyright (c) 2017-2020 Glenn Ruben Bakke
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
  */
 
 #include <stdint.h>
+#include "nrf.h"
 
 extern uint32_t _estack;
 extern uint32_t _sidata;
@@ -43,6 +44,27 @@ void Default_Handler(void) {
 }
 
 void Reset_Handler(void) {
+#if NRF52840_XXAA
+#if defined(BOOTLOADER_VTOR)
+    *((volatile uint32_t*)0xe000ed08) = BOOTLOADER_VTOR;
+#endif
+#if defined(BOOTLOADER_MCUBOOT_VERSION) && (BOOTLOADER_MCUBOOT_VERSION == 10)
+    NVIC_DisableIRQ(POWER_CLOCK_IRQn);
+    NVIC_DisableIRQ(RTC1_IRQn);
+    NRF_CLOCK->INTENCLR = 0xFFFFFFFF;
+    NRF_POWER->INTENCLR = 0xFFFFFFFF;
+    NRF_RTC1->INTENCLR = 0xFFFFFFFF;
+    __enable_irq();
+    __set_BASEPRI(0);
+    __set_MSP(0x20040000);
+    __set_PSP(0);
+    uint32_t control = __get_CONTROL();
+    control &= ~(CONTROL_SPSEL_Msk | CONTROL_nPRIV_Msk);
+    __set_CONTROL(control);
+    __DSB();
+    __ISB();
+#endif
+#endif
     uint32_t * p_src  = &_sidata;
     uint32_t * p_dest = &_sdata;
 

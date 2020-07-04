@@ -2,7 +2,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
- * Copyright (c) 2019 Glenn Ruben Bakke
+ * Copyright (c) 2019-2020 Glenn Ruben Bakke
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,6 +41,10 @@
 #include "ble_drv.h"
 #endif
 
+#if MICROPY_HW_USB_CDC_DUAL
+#include "nrf_gpio.h"
+#endif
+
 extern void tusb_hal_nrf_power_event(uint32_t event);
 
 static void cdc_task(void);
@@ -49,6 +53,31 @@ static uint8_t rx_ringbuf_array[1024];
 static uint8_t tx_ringbuf_array[1024];
 static volatile ringbuf_t rx_ringbuf;
 static volatile ringbuf_t tx_ringbuf;
+
+#if MICROPY_HW_USB_CDC_DUAL
+static uint8_t uarte_rx_ringbuf_array[1024];
+static const nrfx_uart_t uart_instance = NRFX_UART_INSTANCE(0);
+static uint8_t uarte_rx_buf[1];
+
+static volatile ringbuf_t uarte_rx_ringbuf;
+static volatile ringbuf_t uarte_tx_ringbuf;
+
+static void uart_event_handler(nrfx_uart_event_t const *p_event, void *p_context) {
+    if (p_event->type == NRFX_UART_EVT_RX_DONE) {
+        int chr = uarte_rx_buf[0];
+        nrfx_uart_rx(&uart_instance, &uarte_rx_buf[0], 1);
+        ringbuf_put((ringbuf_t*)&uarte_rx_ringbuf, chr);
+    }
+}
+
+bool uarte_rx_any(void) {
+    return uarte_rx_ringbuf.iput != uarte_rx_ringbuf.iget;
+}
+
+int uarte_rx_char(void) {
+    return ringbuf_get((ringbuf_t*)&uarte_rx_ringbuf);
+}
+#endif
 
 static void board_init(void) {
     // Config clock source.
@@ -120,27 +149,52 @@ static int cdc_tx_char(void) {
 
 static void cdc_task(void)
 {
-    if ( tud_cdc_connected() ) {
-        // connected and there are data available
-        while (tud_cdc_available()) {
-            int c;
-            uint32_t count = tud_cdc_read(&c, 1);
-            (void)count;
-            ringbuf_put((ringbuf_t*)&rx_ringbuf, c);
-        }
+    for (uint8_t itf = 0; itf < CFG_TUD_CDC; itf++) {
+        if (itf == 0) {
+            if ( tud_cdc_n_connected(itf) ) {
+                // connected and there are data available
+                while (tud_cdc_n_available(itf)) {
+                    int c;
+                    uint32_t count = tud_cdc_n_read(itf, &c, 1);
+                    (void)count;
+                    ringbuf_put((ringbuf_t*)&rx_ringbuf, c);
+                }
 
-        int chars = 0;
-        while (cdc_tx_any()) {
-            if (chars < 64) {
-               tud_cdc_write_char(cdc_tx_char());
-               chars++;
-            } else {
-               chars = 0;
-               tud_cdc_write_flush();
+                int chars = 0;
+                while (cdc_tx_any()) {
+                    if (chars < 64) {
+                       tud_cdc_n_write_char(itf, cdc_tx_char());
+                       chars++;
+                    } else {
+                       chars = 0;
+                       tud_cdc_n_write_flush(itf);
+                    }
+                }
+
+                tud_cdc_n_write_flush(itf);
             }
         }
+        #if MICROPY_HW_USB_CDC_DUAL
+        else {
+            if (tud_cdc_n_connected(itf)) {
+                if (tud_cdc_n_available(itf)) {
+                     uint8_t buf[4096];
+                     uint32_t count = tud_cdc_n_read(itf, buf, sizeof(buf));
 
-        tud_cdc_write_flush();
+                     while (nrfx_uart_tx_in_progress(&uart_instance)) {
+                         ;
+                     }
+
+                     nrfx_uart_tx(&uart_instance, buf, count);
+                 }
+
+                 while (uarte_rx_any()) {
+                     tud_cdc_n_write_char(itf, uarte_rx_char());
+                     tud_cdc_n_write_flush(itf);
+                 }
+             }
+        }
+        #endif
     }
 }
 
@@ -172,6 +226,47 @@ int usb_cdc_init(void)
     tx_ringbuf.size = sizeof(tx_ringbuf_array);
     tx_ringbuf.iget = 0;
     tx_ringbuf.iput = 0;
+
+#if MICROPY_HW_USB_CDC_DUAL
+    uarte_rx_ringbuf.buf = uarte_rx_ringbuf_array;
+    uarte_rx_ringbuf.size = sizeof(uarte_rx_ringbuf_array);
+    uarte_rx_ringbuf.iget = 0;
+    uarte_rx_ringbuf.iput = 0;
+
+    nrfx_uart_config_t config;
+
+    config.hal_cfg.hwfc = MICROPY_HW_USB_CDC2_UART_HWFC;
+    config.hal_cfg.parity = NRF_UART_PARITY_EXCLUDED;
+    config.interrupt_priority = 3;
+    config.interrupt_priority = 6;
+
+    uint32_t baud = MICROPY_HW_USB_CDC2_UART_BAUDRATE;
+
+    // Magic: calculate 'baudrate' register from the input number.
+    // Every value listed in the datasheet will be converted to the
+    // correct register value, except for 192600. I believe the value
+    // listed in the nrf52 datasheet (0x0EBED000) is incorrectly rounded
+    // and should be 0x0EBEE000, as the nrf51 datasheet lists the
+    // nonrounded value 0x0EBEDFA4.
+    // Some background:
+    // https://devzone.nordicsemi.com/f/nordic-q-a/391/uart-baudrate-register-values/2046#2046
+    config.baudrate = baud / 400 * (uint32_t)(400ULL * (uint64_t)UINT32_MAX / 16000000ULL);
+    config.baudrate = (config.baudrate + 0x800) & 0xffffff000; // rounding
+
+    config.pseltxd = MICROPY_HW_USB_CDC2_UART_TX;
+    config.pselrxd = MICROPY_HW_USB_CDC2_UART_RX;
+    config.pselrts = MICROPY_HW_USB_CDC2_UART_RTS;
+    config.pselcts = MICROPY_HW_USB_CDC2_UART_CTS;
+
+    // Set context to this instance of UART
+    config.p_context = NULL;
+
+    // Enable event callback and start asynchronous receive
+    nrfx_uart_init(&uart_instance, &config, uart_event_handler);
+    nrfx_uart_rx(&uart_instance, &uarte_rx_buf[0], 1);
+    nrfx_uart_rx_enable(&uart_instance);
+
+#endif
 
     tusb_init();
 

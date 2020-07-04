@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2019 Damien P. George
+ * Copyright (c) 2019 Glenn Ruben Bakke
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,28 +23,39 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
-#define MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
 
-#include "py/mphal.h"
+#include <stdbool.h>
 
-// Common configuration
+#include "nrf.h"
+#include "nrf52840_bitfields.h"
 
-#define CFG_TUSB_MCU                OPT_MCU_NRF5X
-#define CFG_TUSB_RHPORT0_MODE       OPT_MODE_DEVICE
+bool uicr_REGOUT0_erased() {
+    if (NRF_UICR->REGOUT0 == 0xFFFFFFFFUL) {
+        return true;
+    }
+    return false;
+}
 
-#define CFG_TUSB_MEM_SECTION
-#define CFG_TUSB_MEM_ALIGN          TU_ATTR_ALIGNED(4)
+void board_modules_init0(void)
+{
+    if (uicr_REGOUT0_erased()) {
 
-// Device configuration
+        // Wait for pending NVMC operations to finish.
+        while (NRF_NVMC->READY != NVMC_READY_READY_Ready);
 
-#define CFG_TUD_ENDOINT0_SIZE       (64)
-#if MICROPY_HW_USB_CDC_DUAL
-#define CFG_TUD_CDC                 (2)
-#else
-#define CFG_TUD_CDC                 (1)
-#endif
-#define CFG_TUD_CDC_RX_BUFSIZE      (64)
-#define CFG_TUD_CDC_TX_BUFSIZE      (64)
+        // Enable write mode in NVMC.
+        NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
+        while (NRF_NVMC->READY != NVMC_READY_READY_Ready);
 
-#endif // MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
+        // Write 3v3 value to UICR->REGOUT0.
+        NRF_UICR->REGOUT0 = (UICR_REGOUT0_VOUT_3V3 & UICR_REGOUT0_VOUT_Msk) << UICR_REGOUT0_VOUT_Pos;
+        while (NRF_NVMC->READY != NVMC_READY_READY_Ready);
+
+        // Enable read mode in NVMC.
+        NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
+        while (NRF_NVMC->READY != NVMC_READY_READY_Ready);
+
+        // Reset to apply the update.
+        NVIC_SystemReset();
+    }
+}

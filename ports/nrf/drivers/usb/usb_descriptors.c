@@ -25,20 +25,38 @@
  */
 
 #include "tusb.h"
+#include "py/mphal.h"
 
 #define USBD_VID (0xf055)
 #define USBD_PID (0x9802)
 
+#if MICROPY_HW_USB_CDC_DUAL
+#define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN * 2)
+#else
 #define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN)
+#endif
 #define USBD_MAX_POWER_MA (250)
 
-#define USBD_ITF_CDC (0) // needs 2 interfaces
-#define USBD_ITF_MAX (2)
+#define USBD_ITF_CDC1 (0)
+#define USBD_ITF_CDC2 (2)
 
-#define USBD_CDC_EP_CMD (0x81)
-#define USBD_CDC_EP_OUT (0x02)
-#define USBD_CDC_EP_IN (0x82)
-#define USBD_CDC_CMD_MAX_SIZE (8)
+#if MICROPY_HW_USB_CDC_DUAL
+#define USBD_ITF_MAX  (4) // needs 2 interfaces for each CDC
+#else
+#define USBD_ITF_MAX  (2) // needs 2 interfaces for each CDC
+#endif
+
+#define USBD_CDC1_EP_CMD (0x81)
+#define USBD_CDC1_EP_OUT (0x02)
+#define USBD_CDC1_EP_IN (0x82)
+#define USBD_CDC1_CMD_MAX_SIZE (8)
+
+#if MICROPY_HW_USB_CDC_DUAL
+#define USBD_CDC2_EP_CMD (0x83)
+#define USBD_CDC2_EP_OUT (0x04)
+#define USBD_CDC2_EP_IN (0x84)
+#define USBD_CDC2_CMD_MAX_SIZE (8)
+#endif
 
 #define USBD_STR_0 (0x00)
 #define USBD_STR_MANUF (0x01)
@@ -69,8 +87,12 @@ static const uint8_t usbd_desc_cfg[USBD_DESC_LEN] = {
     TUD_CONFIG_DESCRIPTOR(USBD_ITF_MAX, USBD_STR_0, USBD_DESC_LEN,
         TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, USBD_MAX_POWER_MA),
 
-    TUD_CDC_DESCRIPTOR(USBD_ITF_CDC, USBD_STR_CDC, USBD_CDC_EP_CMD,
-        USBD_CDC_CMD_MAX_SIZE, USBD_CDC_EP_OUT, USBD_CDC_EP_IN, CFG_TUD_CDC_RX_BUFSIZE),
+    TUD_CDC_DESCRIPTOR(USBD_ITF_CDC1, USBD_STR_CDC, USBD_CDC1_EP_CMD,
+        USBD_CDC1_CMD_MAX_SIZE, USBD_CDC1_EP_OUT, USBD_CDC1_EP_IN, CFG_TUD_CDC_RX_BUFSIZE),
+    #if MICROPY_HW_USB_CDC_DUAL
+    TUD_CDC_DESCRIPTOR(USBD_ITF_CDC2, USBD_STR_CDC, USBD_CDC2_EP_CMD,
+        USBD_CDC2_CMD_MAX_SIZE, USBD_CDC2_EP_OUT, USBD_CDC2_EP_IN, CFG_TUD_CDC_RX_BUFSIZE),
+    #endif
 };
 
 static const char *const usbd_desc_str[] = {

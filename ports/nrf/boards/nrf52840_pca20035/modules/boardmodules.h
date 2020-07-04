@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2019 Damien P. George
+ * Copyright (c) 2020 Glenn Ruben Bakke
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,28 +23,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
-#define MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
 
-#include "py/mphal.h"
+#ifndef MICROPY_INCLUDED_NRF_BOARD_NRF52840_PCA20035_BOARD_MODULES_H
+#define MICROPY_INCLUDED_NRF_BOARD_NRF52840_PCA10035_BOARD_MODULES_H
 
-// Common configuration
+#define BOARD_MODULES
 
-#define CFG_TUSB_MCU                OPT_MCU_NRF5X
-#define CFG_TUSB_RHPORT0_MODE       OPT_MODE_DEVICE
+void board_modules_init0(void);
 
-#define CFG_TUSB_MEM_SECTION
-#define CFG_TUSB_MEM_ALIGN          TU_ATTR_ALIGNED(4)
-
-// Device configuration
-
-#define CFG_TUD_ENDOINT0_SIZE       (64)
-#if MICROPY_HW_USB_CDC_DUAL
-#define CFG_TUD_CDC                 (2)
-#else
-#define CFG_TUD_CDC                 (1)
-#endif
-#define CFG_TUD_CDC_RX_BUFSIZE      (64)
-#define CFG_TUD_CDC_TX_BUFSIZE      (64)
-
-#endif // MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
+#endif // MICROPY_INCLUDED_NRF_BOARD_NRF52840_PCA20035_BOARD_MODULES_H
