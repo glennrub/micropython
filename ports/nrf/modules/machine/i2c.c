@@ -120,8 +120,15 @@ mp_obj_t machine_hard_i2c_make_new(const mp_obj_type_t *type, size_t n_args, siz
     config.hold_bus_uninit = false;
 
     // Set context to this object.
-    nrfx_twi_init(&self->p_twi, &config, NULL, (void *)self);
-
+    nrfx_err_t err = nrfx_twi_init(&self->p_twi, &config, NULL, (void *)self);
+    if (err == NRFX_ERROR_INVALID_STATE)
+    {
+        nrfx_twi_uninit(&self->p_twi);
+        nrfx_err_t err = nrfx_twi_init(&self->p_twi, &config, NULL, (void *)self);
+        if (err != NRFX_SUCCESS) {
+            return mp_const_none;
+        }
+    }
     return MP_OBJ_FROM_PTR(self);
 }
 
