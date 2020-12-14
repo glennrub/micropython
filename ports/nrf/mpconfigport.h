@@ -233,6 +233,7 @@ extern const struct _mp_obj_module_t mp_module_utime;
 extern const struct _mp_obj_module_t mp_module_uos;
 extern const struct _mp_obj_module_t mp_module_ubluepy;
 extern const struct _mp_obj_module_t music_module;
+extern const struct _mp_obj_module_t mp_module_onewire;
 
 #if MICROPY_PY_NRF
 #define NRF_MODULE                          { MP_ROM_QSTR(MP_QSTR_nrf), MP_ROM_PTR(&nrf_module) },
@@ -279,7 +280,7 @@ extern const struct _mp_obj_module_t ble_module;
     UBLUEPY_MODULE \
     MICROPY_BOARD_BUILTINS \
     NRF_MODULE \
-
+    { MP_ROM_QSTR(MP_QSTR__onewire), MP_ROM_PTR(&mp_module_onewire) }, \
 
 #else
 extern const struct _mp_obj_module_t ble_module;
@@ -291,7 +292,7 @@ extern const struct _mp_obj_module_t ble_module;
     MUSIC_MODULE \
     MICROPY_BOARD_BUILTINS \
     NRF_MODULE \
-
+    { MP_ROM_QSTR(MP_QSTR__onewire), MP_ROM_PTR(&mp_module_onewire) }, \
 
 #endif // BLUETOOTH_SD
 

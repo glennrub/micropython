@@ -77,5 +77,18 @@ mp_uint_t mp_hal_ticks_ms(void);
 #define mp_hal_delay_us_fast(p)
 #define mp_hal_ticks_cpu() (0)
 
+static inline uint32_t mp_hal_critical_section_enter(void) {
+    uint32_t old_primask = __get_PRIMASK();
+    __disable_irq();
+    return old_primask;
+}
+
+static inline void mp_hal_critical_section_exit(uint32_t irq_state) {
+     __set_PRIMASK(irq_state);
+}
+
+#define mp_hal_quiet_timing_enter()          mp_hal_critical_section_enter()
+#define mp_hal_quiet_timing_exit(irq_state)  mp_hal_critical_section_exit(irq_state)
+
 #endif
 

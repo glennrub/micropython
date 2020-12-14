@@ -285,6 +285,11 @@ SRC_C += $(addprefix lib/tinyusb/src/,\
 	)
 endif
 
+
+EXTMOD_SRC_C += $(addprefix extmod/,\
+	modonewire.c \
+        )
+
 DRIVERS_SRC_C += $(addprefix modules/,\
 	machine/modmachine.c \
 	machine/uart.c \
@@ -338,6 +343,7 @@ OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX_HAL:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SYSTEM_C_SRC:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(EXTMOD_SRC_C:.c=.o))
 OBJ += $(BUILD)/pins_gen.o
 
 $(BUILD)/$(OOFATFS_DIR)/ff.o: COPT += -Os
@@ -492,7 +498,7 @@ $(BUILD)/$(OUTPUT_FILENAME).elf: $(OBJ)
 	$(Q)$(SIZE) $@
 
 # List of sources for qstr extraction
-SRC_QSTR += $(SRC_C) $(SRC_LIB) $(DRIVERS_SRC_C) $(SRC_BOARD_MODULES) $(SRC_MOD) 
+SRC_QSTR += $(SRC_C) $(SRC_LIB) $(DRIVERS_SRC_C) $(SRC_BOARD_MODULES) $(SRC_MOD) $(EXTMOD_SRC_C)
 
 # Append any auto-generated sources that are needed by sources listed in
 # SRC_QSTR
