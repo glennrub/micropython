@@ -132,6 +132,10 @@ int main(int argc, char **argv) {
 
 
 soft_reset:
+    #if MICROPY_PY_TIME_DELAY_FAST
+    timer0_init_delay_us_fast();
+    #endif
+
     #if MICROPY_PY_TIME_TICKS
     rtc1_init_time_ticks();
     #endif

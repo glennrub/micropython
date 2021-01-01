@@ -40,6 +40,76 @@
 #include "nrf_clock.h"
 #endif
 
+#define DELAY_FAST (1)
+
+// Forward declare.
+void mp_hal_delay_us_blocking(mp_uint_t us);
+
+#if MICROPY_PY_TIME_DELAY_FAST
+
+volatile bool m_cc0_timeout;
+
+void TIMER0_IRQHandler ()
+{
+    if (NRF_TIMER0->EVENTS_COMPARE[0]) {
+        m_cc0_timeout = true;
+        NRF_TIMER0->EVENTS_COMPARE[0] = 0;
+    }
+}
+
+void
+mp_hal_delay_us_fast(mp_uint_t us)
+{
+
+    if (us <= 2) {
+        mp_hal_delay_us_blocking(us);
+        return;
+    }
+
+    m_cc0_timeout = false;
+    NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+    NRF_TIMER0->EVENTS_COMPARE[0] = 0;
+    NRF_TIMER0->INTENSET = TIMER_INTENSET_COMPARE0_Msk;
+    NRF_TIMER0->CC[0] = us;
+    NRF_TIMER0->TASKS_START = 1;
+
+    while (!(m_cc0_timeout)) {
+    }
+
+    NRF_TIMER0->INTENCLR = TIMER_INTENCLR_COMPARE0_Msk;
+
+    return;
+}
+
+void timer0_init_delay_us_fast(void) {
+    // Start clocks.
+    NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
+    NRF_CLOCK->EVENTS_LFCLKSTARTED = 0;
+    NRF_CLOCK->LFCLKSRC = (CLOCK_LFCLKSTAT_SRC_Xtal << CLOCK_LFCLKSTAT_SRC_Pos);
+    NRF_CLOCK->TASKS_HFCLKSTART = 1;
+    NRF_CLOCK->TASKS_LFCLKSTART = 1;
+    while (! (NRF_CLOCK->EVENTS_HFCLKSTARTED && NRF_CLOCK->EVENTS_LFCLKSTARTED)) {
+    }
+
+    NRF_TIMER0->MODE = (TIMER_MODE_MODE_Timer << TIMER_MODE_MODE_Pos);
+    NRF_TIMER0->SHORTS = TIMER_SHORTS_COMPARE0_CLEAR_Enabled << TIMER_SHORTS_COMPARE0_CLEAR_Pos;
+    NRF_TIMER0->PRESCALER = 4;    // 16.
+    NRF_TIMER0->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
+    NRF_TIMER0->INTENCLR = 0xFFFFFFFF;
+    NRF_TIMER0->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
+
+    NRF_TIMER0->TASKS_CLEAR = 1;
+
+    NRF_PPI->CH[0].EEP = (uint32_t)&NRF_TIMER0->EVENTS_COMPARE[0];
+    NRF_PPI->CH[0].TEP = (uint32_t)&NRF_TIMER0->TASKS_STOP;
+
+    NRF_PPI->CHENSET = (1UL << 0);
+
+    NVIC_ClearPendingIRQ(TIMER0_IRQn);
+    NVIC_EnableIRQ(TIMER0_IRQn);
+}
+#endif
+
 #if MICROPY_PY_TIME_TICKS
 
 // Use RTC1 for time ticks generation (ms and us) with 32kHz tick resolution
@@ -215,6 +285,14 @@ void mp_hal_stdout_tx_str(const char *str) {
 #if MICROPY_PY_TIME_TICKS
 
 void mp_hal_delay_us(mp_uint_t us) {
+    if (us < 33) {
+        #if MICROPY_PY_TIME_DELAY_FAST
+        mp_hal_delay_us_fast(us);
+        #else
+        mp_hal_delay_us_blocking(us);
+        #endif
+    }
+
     uint32_t now;
     if (us == 0) {
         return;
@@ -238,6 +316,18 @@ void mp_hal_delay_ms(mp_uint_t ms) {
 #else
 
 void mp_hal_delay_us(mp_uint_t us) {
+    mp_hal_us_blocking(us);
+}
+
+void mp_hal_delay_ms(mp_uint_t ms) {
+    for (mp_uint_t i = 0; i < ms; i++)
+    {
+        mp_hal_delay_us(999);
+    }
+}
+#endif
+
+void mp_hal_delay_us_blocking(mp_uint_t us) {
     if (us == 0) {
         return;
     }
@@ -308,18 +398,11 @@ void mp_hal_delay_us(mp_uint_t us) {
         " NOP\n"
         " NOP\n"
         " NOP\n"
+        " NOP\n"
         #endif
         " BNE 1b\n"
         : "+r" (delay));
 }
-
-void mp_hal_delay_ms(mp_uint_t ms) {
-    for (mp_uint_t i = 0; i < ms; i++)
-    {
-        mp_hal_delay_us(999);
-    }
-}
-#endif
 
 #if defined(NRFX_LOG_ENABLED) && (NRFX_LOG_ENABLED == 1)
 

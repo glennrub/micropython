@@ -189,6 +189,10 @@
 #define MICROPY_PY_TIME_TICKS       (1)
 #endif
 
+#ifndef MICROPY_PY_TIME_DELAY_FAST
+#define MICROPY_PY_TIME_DELAY_FAST  (1)
+#endif
+
 #ifndef MICROPY_PY_NRF
 #define MICROPY_PY_NRF              (0)
 #endif

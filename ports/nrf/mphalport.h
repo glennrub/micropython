@@ -64,7 +64,20 @@ const char *nrfx_error_code_lookup(uint32_t err_code);
 #define mp_hal_pin_write(p, v)   ((v) ? mp_hal_pin_high(p) : mp_hal_pin_low(p))
 #define mp_hal_pin_od_low(p)     mp_hal_pin_low(p)
 #define mp_hal_pin_od_high(p)    mp_hal_pin_high(p)
-#define mp_hal_pin_open_drain(p) nrf_gpio_cfg_input(p->pin, NRF_GPIO_PIN_NOPULL)
+#define mp_hal_pin_open_drain(p) nrf_gpio_cfg_input(p->pin, NRF_GPIO_PIN_PULLUP)
+
+static inline void mp_hal_pin_open_drain_write(const pin_obj_t * p, uint32_t v) {
+    nrf_gpio_pin_dir_set(p->pin, NRF_GPIO_PIN_DIR_OUTPUT);
+    mp_hal_pin_write(p, v);
+}
+
+static inline uint32_t mp_hal_pin_open_drain_read(const pin_obj_t * p) {
+    nrf_gpio_pin_dir_set(p->pin, NRF_GPIO_PIN_DIR_INPUT);
+    uint32_t t = mp_hal_pin_read(p);
+    return t;
+}
+
+void timer0_init_delay_us_fast(void);
 
 #if MICROPY_PY_TIME_TICKS
 void rtc1_init_time_ticks();
@@ -74,17 +87,20 @@ mp_uint_t mp_hal_ticks_ms(void);
 #endif
 
 // TODO: empty implementation for now. Used by machine_spi.c:69
-#define mp_hal_delay_us_fast(p)
+void mp_hal_delay_us_fast(mp_uint_t us);
 #define mp_hal_ticks_cpu() (0)
 
 static inline uint32_t mp_hal_critical_section_enter(void) {
+/*
     uint32_t old_primask = __get_PRIMASK();
     __disable_irq();
     return old_primask;
+*/
+    return 0;
 }
 
 static inline void mp_hal_critical_section_exit(uint32_t irq_state) {
-     __set_PRIMASK(irq_state);
+//     __set_PRIMASK(irq_state);
 }
 
 #define mp_hal_quiet_timing_enter()          mp_hal_critical_section_enter()

@@ -42,7 +42,9 @@ typedef struct _machine_timer_obj_t {
 } machine_timer_obj_t;
 
 STATIC mp_obj_t machine_timer_callbacks[] = {
+#if (MICROPY_PY_TIME_DELAY_FAST == 0)
     NULL,
+#endif
     NULL,
     NULL,
 #if defined(NRF52_SERIES)
@@ -52,7 +54,9 @@ STATIC mp_obj_t machine_timer_callbacks[] = {
 };
 
 STATIC const machine_timer_obj_t machine_timer_obj[] = {
+#if (MICROPY_PY_TIME_DELAY_FAST == 0)
     {{&machine_timer_type}, NRFX_TIMER_INSTANCE(0)},
+#endif
 #if MICROPY_PY_MACHINE_SOFT_PWM
     { },
 #else
