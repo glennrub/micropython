@@ -244,7 +244,7 @@ ble_npl_error_t ble_npl_sem_pend(struct ble_npl_sem *sem, ble_npl_time_t timeout
             // This function may be called at thread-level, so execute
             // mp_bluetooth_nimble_hci_uart_process at raised priority.
             MICROPY_PY_BLUETOOTH_ENTER
-            mp_bluetooth_nimble_hci_uart_process();
+//            mp_bluetooth_nimble_hci_uart_process();
             MICROPY_PY_BLUETOOTH_EXIT
             if (sem->count != 0) {
                 break;
@@ -388,7 +388,7 @@ void ble_npl_time_delay(ble_npl_time_t ticks) {
 
 uint32_t ble_npl_hw_enter_critical(void) {
     DEBUG_CRIT_printf("ble_npl_hw_enter_critical()\n");
-    return raise_irq_pri(15);
+    return raise_irq_pri(8);
 }
 
 void ble_npl_hw_exit_critical(uint32_t ctx) {

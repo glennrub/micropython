@@ -70,7 +70,6 @@ LIB_SRC_C += $(addprefix $(NIMBLE_LIB_DIR)/, \
 		) \
 	nimble/host/store/ram/src/ble_store_ram.c \
 	nimble/host/util/src/addr.c \
-	nimble/transport/uart/src/ble_hci_uart.c \
 	$(addprefix porting/nimble/src/, \
 		endian.c \
 		mem.c \
@@ -83,8 +82,19 @@ LIB_SRC_C += $(addprefix $(NIMBLE_LIB_DIR)/, \
 
 EXTMOD_SRC_C += $(addprefix $(NIMBLE_EXTMOD_DIR)/, \
 	nimble/npl_os.c \
-	hal/hal_uart.c \
 	)
+
+#MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_UART ?= 0
+#ifneq ($(MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_UART),1)
+#EXTMOD_SRC_C += $(addprefix $(NIMBLE_EXTMOD_DIR)/, \
+#	hal/hal_uart.c \
+#	)
+#
+#LIB_SRC_C += $(addprefix $(NIMBLE_LIB_DIR)/, \
+#	nimble/transport/uart/src/ble_hci_uart.c \
+#	)
+#CFLAGS_MOD += -DMICROPY_BLUETOOTH_NIMBLE_TRANSPORT_UART=1
+#endif
 
 INC += -I$(TOP)/$(NIMBLE_EXTMOD_DIR)
 INC += -I$(TOP)/$(NIMBLE_LIB_DIR)

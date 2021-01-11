@@ -26,6 +26,8 @@
 #ifndef MICROPY_INCLUDED_STM32_IRQ_H
 #define MICROPY_INCLUDED_STM32_IRQ_H
 
+#include "nrf.h"
+
 // Use this macro together with NVIC_SetPriority to indicate that an IRQn is non-negative,
 // which helps the compiler optimise the resulting inline function.
 #define IRQn_NONNEG(pri) ((pri) & 0x7f)
@@ -59,6 +61,16 @@ static inline uint32_t query_irq(void) {
 // enable_irq and disable_irq are defined inline in mpconfigport.h
 
 #if __CORTEX_M >= 0x03
+
+static inline void enable_irq(mp_uint_t state) {
+    __set_PRIMASK(state);
+}
+
+static inline mp_uint_t disable_irq(void) {
+    mp_uint_t state = __get_PRIMASK();
+    __disable_irq();
+    return state;
+}
 
 // irqs with a priority value greater or equal to "pri" will be disabled
 // "pri" should be between 1 and 15 inclusive

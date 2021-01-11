@@ -63,4 +63,6 @@ struct ble_npl_sem {
     volatile uint16_t count;
 };
 
+void ble_npl_hw_set_isr(int irqn, void (*addr)());
+
 #endif // MICROPY_INCLUDED_STM32_NIMBLE_NIMBLE_NPL_OS_H

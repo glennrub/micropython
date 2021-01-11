@@ -4,6 +4,10 @@
 #include "py/mphal.h"
 #include "uart.h"
 
+#if defined(MICROPY_BLUETOOTH_NIMBLE_CUSTOM_SYSCFG_H)
+#include MICROPY_BLUETOOTH_NIMBLE_CUSTOM_SYSCFG_H
+#endif
+
 void *nimble_malloc(size_t size);
 void nimble_free(void *ptr);
 void *nimble_realloc(void *ptr, size_t size);
@@ -28,8 +32,13 @@ int nimble_sprintf(char *str, const char *fmt, ...);
 #define MYNEWT_VAL_MSYS_1_BLOCK_SIZE (292)
 #define MYNEWT_VAL_MSYS_2_BLOCK_COUNT (0)
 #define MYNEWT_VAL_MSYS_2_BLOCK_SIZE (0)
-#define MYNEWT_VAL_OS_CPUTIME_FREQ (1000000)
-#define MYNEWT_VAL_OS_CPUTIME_TIMER_NUM (0)
+#if defined(MICROPY_BLUETOOTH_NIMBLE_CPU_FREQ)
+#define MYNEWT_VAL_OS_CPUTIME_FREQ (MICROPY_BLUETOOTH_NIMBLE_CPU_FREQ)
+#else
+#define MYNEWT_VAL_OS_CPUTIME_FREQ (MICROPY_BLUETOOTH_NIMBLE_CPU_FREQ)
+#endif
+
+#define MYNEWT_VAL_OS_CPUTIME_TIMER_NUM (5)
 #define MYNEWT_VAL_OS_CTX_SW_STACK_CHECK (0)
 #define MYNEWT_VAL_OS_CTX_SW_STACK_GUARD (4)
 #define MYNEWT_VAL_OS_MAIN_STACK_SIZE (1024)
@@ -137,10 +146,28 @@ int nimble_sprintf(char *str, const char *fmt, ...);
 #define MYNEWT_VAL_BLE_SVC_GAP_PPCP_SUPERVISION_TMO (0)
 
 /* Overridden by targets/porting-nimble (defined by nimble/transport) */
+#if defined(MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_NIMBLE_BUILTIN) && (MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_NIMBLE_BUILTIN)
+#define MYNEWT_VAL_BLE_HCI_TRANSPORT_NIMBLE_BUILTIN (1)
+#pragma error "NIMBLE BUILTIN"
+#else
 #define MYNEWT_VAL_BLE_HCI_TRANSPORT_NIMBLE_BUILTIN (0)
+#endif
+#if defined(MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_RAM) && (MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_RAM)
+#define MYNEWT_VAL_BLE_HCI_TRANSPORT_RAM (1)
+#else
 #define MYNEWT_VAL_BLE_HCI_TRANSPORT_RAM (0)
+#endif
+#if defined(MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_SOCKET) && (MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_SOCKET)
+#define MYNEWT_VAL_BLE_HCI_TRANSPORT_SOCKET (1)
+#else
 #define MYNEWT_VAL_BLE_HCI_TRANSPORT_SOCKET (0)
+#endif
+#if defined(MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_UART) && (MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_UART)
+#pragma error "UART"
 #define MYNEWT_VAL_BLE_HCI_TRANSPORT_UART (1)
+#else
+#define MYNEWT_VAL_BLE_HCI_TRANSPORT_UART (0)
+#endif
 
 /*** nimble/transport/uart */
 #define MYNEWT_VAL_BLE_ACL_BUF_COUNT (12)
@@ -151,12 +178,14 @@ int nimble_sprintf(char *str, const char *fmt, ...);
 #define MYNEWT_VAL_BLE_HCI_EVT_LO_BUF_COUNT (8)
 
 /* Overridden by targets/porting-nimble (defined by nimble/transport/uart) */
+#if defined(MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_UART) && (MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_UART)
 #define MYNEWT_VAL_BLE_HCI_UART_BAUD (MICROPY_HW_BLE_UART_BAUDRATE)
 #define MYNEWT_VAL_BLE_HCI_UART_DATA_BITS (8)
 #define MYNEWT_VAL_BLE_HCI_UART_FLOW_CTRL (1)
 #define MYNEWT_VAL_BLE_HCI_UART_PARITY (HAL_UART_PARITY_NONE)
 #define MYNEWT_VAL_BLE_HCI_UART_PORT (MICROPY_HW_BLE_UART_ID)
 #define MYNEWT_VAL_BLE_HCI_UART_STOP_BITS (1)
+#endif
 
 /* Required for code that uses BLE_HS_LOG */
 #define MYNEWT_VAL_NEWT_FEATURE_LOGCFG (1)

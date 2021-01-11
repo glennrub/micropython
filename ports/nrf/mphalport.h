@@ -75,5 +75,17 @@ mp_uint_t mp_hal_ticks_ms(void);
 #define mp_hal_delay_us_fast(p)
 #define mp_hal_ticks_cpu() (0)
 
+enum {
+    MP_HAL_MAC_WLAN0 = 0,
+    MP_HAL_MAC_WLAN1,
+    MP_HAL_MAC_BDADDR,
+    MP_HAL_MAC_ETH0,
+};
+
+void mp_hal_generate_laa_mac(int idx, uint8_t buf[6]);
+void mp_hal_get_mac(int idx, uint8_t buf[6]);
+void mp_hal_get_mac_ascii(int idx, size_t chr_off, size_t chr_len, char *dest);
+
+
 #endif
 

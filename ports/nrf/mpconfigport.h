@@ -41,6 +41,8 @@
   #pragma error "Device not defined"
 #endif
 
+#define MP_HAL_UNIQUE_ID_ADDRESS (0x1ff0f420)
+
 // options to control how MicroPython is built
 #ifndef MICROPY_VFS
 #define MICROPY_VFS                 (0)
@@ -142,6 +144,10 @@
 #define MICROPY_PY_MACHINE_SPI      (0)
 #define MICROPY_PY_MACHINE_SPI_MIN_DELAY (0)
 #define MICROPY_PY_FRAMEBUF         (0)
+
+#if MICROPY_PY_BLUETOOTH
+#define MICROPY_ENABLE_SCHEDULER    (1)
+#endif
 
 #ifndef MICROPY_HW_LED_COUNT
 #define MICROPY_HW_LED_COUNT        (0)
@@ -314,6 +320,13 @@ extern const struct _mp_obj_module_t ble_module;
 #define NUM_OF_PINS 32
 #endif
 
+#if MICROPY_BLUETOOTH_NIMBLE
+struct _mp_bluetooth_nimble_root_pointers_t;
+#define MICROPY_PORT_ROOT_POINTER_BLUETOOTH_NIMBLE void **bluetooth_nimble_memory; struct _mp_bluetooth_nimble_root_pointers_t *bluetooth_nimble_root_pointers;
+#else
+#define MICROPY_PORT_ROOT_POINTER_BLUETOOTH_NIMBLE
+#endif
+
 #define MICROPY_PORT_ROOT_POINTERS \
     const char *readline_hist[8]; \
     mp_obj_t pin_class_mapper; \
@@ -328,6 +341,7 @@ extern const struct _mp_obj_module_t ble_module;
     \
     /* micro:bit root pointers */ \
     void *async_data[2]; \
+    MICROPY_PORT_ROOT_POINTER_BLUETOOTH_NIMBLE \
 
 #define MICROPY_EVENT_POLL_HOOK \
     do { \
@@ -338,9 +352,22 @@ extern const struct _mp_obj_module_t ble_module;
 
 #define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 
+
+#include "irq.h"
+
+// Bluetooth calls must run at a raised IRQ priority
+#if NRF51
+#define MICROPY_PY_BLUETOOTH_PRI 3
+#else
+#define MICROPY_PY_BLUETOOTH_PRI 5
+#endif
+#define MICROPY_PY_BLUETOOTH_ENTER uint32_t atomic_state = raise_irq_pri(MICROPY_PY_BLUETOOTH_PRI);
+#define MICROPY_PY_BLUETOOTH_EXIT restore_irq_pri(atomic_state);
+
 // We need to provide a declaration/definition of alloca()
 #include <alloca.h>
 
 #define MICROPY_PIN_DEFS_PORT_H "pin_defs_nrf5.h"
-
+#define MICROPY_BLUETOOTH_NIMBLE_CUSTOM_SYSCFG_H "custom_nimble_syscfg.h"
+#define MICROPY_BLUETOOTH_NIMBLE_CPU_FREQ 32768
 #endif

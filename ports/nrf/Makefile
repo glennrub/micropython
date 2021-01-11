@@ -46,7 +46,7 @@ endif
 # include py core make definitions
 include ../../py/py.mk
 
-GIT_SUBMODULES = lib/nrfx lib/tinyusb
+GIT_SUBMODULES = lib/nrfx lib/tinyusb lib/mynewt-nimble
 
 MICROPY_VFS_FAT ?= 0
 MPY_CROSS = ../../mpy-cross/mpy-cross
@@ -300,6 +300,59 @@ DRIVERS_SRC_C += $(addprefix modules/,\
 	ble/modble.c \
 	)
 
+
+ifeq ($(MICROPY_PY_BLUETOOTH),1)
+CFLAGS += -DMICROPY_PY_BLUETOOTH=1
+CFLAGS += -DMICROPY_PY_BLUETOOTH_ENABLE_CENTRAL_MODE=1
+CFLAGS += -DMICROPY_PY_BLUETOOTH_GATTS_ON_READ_CALLBACK=1
+
+MICROPY_BLUETOOTH_NIMBLE ?= 1
+MICROPY_BLUETOOTH_NIMBLE_TRANSPORT_UART ?= 0
+#CFLAGS_MOD += -DMICROPY_BLUETOOTH_NIMBLE_TRANSPORT_NIMBLE_BUILTIN=1
+CFLAGS_MOD += -DMICROPY_BLUETOOTH_NIMBLE_TRANSPORT_RAM=1
+CFLAGS_MOD += -DNIMBLE_CFG_CONTROLLER=1
+include $(TOP)/extmod/nimble/nimble.mk
+
+SRC_C += nimble.c
+
+LIB_SRC_C += $(addprefix $(NIMBLE_LIB_DIR)/, \
+	porting/nimble/src/hal_timer.c \
+	porting/nimble/src/os_cputime.c \
+	porting/nimble/src/os_cputime_pwr2.c \
+	nimble/transport/ram/src/ble_hci_ram.c \
+	$(addprefix nimble/controller/src/,\
+		ble_ll_adv.c \
+		ble_ll.c \
+		ble_ll_conn.c \
+		ble_ll_conn_hci.c \
+		ble_ll_ctrl.c \
+		ble_ll_dtm.c \
+		ble_ll_hci.c \
+		ble_ll_hci_ev.c \
+		ble_ll_rand.c \
+		ble_ll_resolv.c \
+		ble_ll_rfmgmt.c \
+		ble_ll_scan.c \
+		ble_ll_sched.c \
+		ble_ll_supp_cmd.c \
+		ble_ll_sync.c \
+		ble_ll_trace.c \
+		ble_ll_utils.c \
+		ble_ll_whitelist.c \
+		) \
+	$(addprefix nimble/drivers/$(MCU_VARIANT)/src/,\
+		ble_hw.c \
+		ble_phy.c \
+		) \
+	)
+
+INC += -I$(TOP)/$(NIMBLE_LIB_DIR)/nimble/controller/include
+INC += -I$(TOP)/$(NIMBLE_LIB_DIR)/nimble/drivers/$(MCU_VARIANT)/include
+INC += -I$(TOP)/$(NIMBLE_LIB_DIR)/porting/nimble/include
+INC += -I$(TOP)/$(NIMBLE_LIB_DIR)/nimble/transport/ram/include
+
+endif
+
 # Custom micropython startup file with smaller interrupt vector table
 # than the file provided in nrfx.
 SRC_C += \
@@ -320,6 +373,8 @@ OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX_HAL:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SYSTEM_C_SRC:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(LIB_SRC_C:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(EXTMOD_SRC_C:.c=.o))
 OBJ += $(BUILD)/pins_gen.o
 
 $(BUILD)/$(OOFATFS_DIR)/ff.o: COPT += -Os

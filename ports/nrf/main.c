@@ -76,6 +76,10 @@
 #include "usb_cdc.h"
 #endif
 
+#if MICROPY_PY_BLUETOOTH
+#include "extmod/modbluetooth.h"
+#endif
+
 void do_str(const char *src, mp_parse_input_kind_t input_kind) {
     mp_lexer_t *lex = mp_lexer_new_from_str_len(MP_QSTR__lt_stdin_gt_, src, strlen(src), 0);
     if (lex == NULL) {
@@ -262,6 +266,10 @@ soft_reset:
 
     #if BLUETOOTH_SD
     sd_softdevice_disable();
+    #endif
+
+    #if MICROPY_PY_BLUETOOTH
+    mp_bluetooth_deinit();
     #endif
 
     goto soft_reset;

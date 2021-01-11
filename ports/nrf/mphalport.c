@@ -40,6 +40,10 @@
 #include "nrf_clock.h"
 #endif
 
+#if MICROPY_PY_BLUETOOTH
+#include "nimble.h"
+#endif
+
 #if MICROPY_PY_TIME_TICKS
 
 // Use RTC1 for time ticks generation (ms and us) with 32kHz tick resolution
@@ -94,6 +98,10 @@ STATIC void rtc_irq_time(nrfx_rtc_int_type_t event) {
     // irq handler for wakeup from WFI (~1msec)
     if (event == NRFX_RTC_INT_COMPARE0) {
         RTC_RESCHEDULE_CC(rtc1, 0, RTC_TICK_INCREASE_MSEC)
+
+        #if MICROPY_PY_BLUETOOTH
+        nimble_schedule_callouts();
+        #endif
     }
 }
 
@@ -372,3 +380,31 @@ const char *nrfx_error_code_lookup(uint32_t err_code) {
 }
 
 #endif // NRFX_LOG_ENABLED
+
+/*******************************************************************************/
+// MAC address
+
+// Generate a random locally administered MAC address (LAA)
+void mp_hal_generate_laa_mac(int idx, uint8_t buf[6]) {
+    uint8_t *id = (uint8_t *)MP_HAL_UNIQUE_ID_ADDRESS;
+    buf[0] = 0x02; // LAA range
+    buf[1] = (id[11] << 4) | (id[10] & 0xf);
+    buf[2] = (id[9] << 4) | (id[8] & 0xf);
+    buf[3] = (id[7] << 4) | (id[6] & 0xf);
+    buf[4] = id[2];
+    buf[5] = (id[0] << 2) | idx;
+}
+
+// A board can override this if needed
+MP_WEAK void mp_hal_get_mac(int idx, uint8_t buf[6]) {
+    mp_hal_generate_laa_mac(idx, buf);
+}
+
+void mp_hal_get_mac_ascii(int idx, size_t chr_off, size_t chr_len, char *dest) {
+    static const char hexchr[16] = "0123456789ABCDEF";
+    uint8_t mac[6];
+    mp_hal_get_mac(idx, mac);
+    for (; chr_len; ++chr_off, --chr_len) {
+        *dest++ = hexchr[mac[chr_off >> 1] >> (4 * (1 - (chr_off & 1))) & 0xf];
+    }
+}
